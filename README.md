@@ -51,14 +51,14 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 1. Grave o MicroPython para **ESP32-C3** (https://micropython.org/download/ESP32_GENERIC_C3/):
    ```bash
    pip install esptool mpremote
-   esptool.py --chip esp32c3 --port /dev/ttyACM0 erase_flash
-   esptool.py --chip esp32c3 --port /dev/ttyACM0 write_flash -z 0x0 ESP32_GENERIC_C3-*.bin
+   python -m esptool --chip esp32c3 --port /dev/ttyACM0 erase_flash
+   python -m esptool --chip esp32c3 --port /dev/ttyACM0 write_flash -z 0x0 ESP32_GENERIC_C3-*.bin
    ```
    (Se não entrar em modo boot: segure **BOOT**, aperte **RESET**, solte BOOT.)
 2. Copie os arquivos:
    ```bash
    cd firmware
-   mpremote connect /dev/ttyACM0 cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset
+   python -m mpremote connect /dev/ttyACM0 cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset
    ```
 3. Teste a fiação antes (loopback e sondagem da fonte): `import selftest` no REPL,
    ver [docs/HARDWARE.md](docs/HARDWARE.md#roteiro-de-teste-nesta-ordem).

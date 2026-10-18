@@ -4,7 +4,7 @@
     {
       "label": "Firmware: enviar tudo e reiniciar",
       "type": "shell",
-      "command": "mpremote cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset",
+      "command": "python -m mpremote cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset",
       "options": {
         "cwd": "${workspaceFolder}/firmware"
       },
@@ -17,7 +17,7 @@
     {
       "label": "Firmware: enviar arquivo aberto e reiniciar",
       "type": "shell",
-      "command": "mpremote cp \"${file}\" : + reset",
+      "command": "python -m mpremote cp \"${file}\" : + reset",
       "options": {
         "cwd": "${workspaceFolder}/firmware"
       },
@@ -26,7 +26,7 @@
     {
       "label": "Firmware: REPL / log (sair com Ctrl+X)",
       "type": "shell",
-      "command": "mpremote repl",
+      "command": "python -m mpremote repl",
       "problemMatcher": [],
       "presentation": {
         "panel": "dedicated",
@@ -36,19 +36,19 @@
     {
       "label": "Firmware: autoteste loopback",
       "type": "shell",
-      "command": "mpremote exec \"import selftest; selftest.loopback()\"",
+      "command": "python -m mpremote exec \"import selftest; selftest.loopback()\"",
       "problemMatcher": []
     },
     {
       "label": "Firmware: sondar fonte (probe)",
       "type": "shell",
-      "command": "mpremote exec \"import selftest; selftest.probe()\"",
+      "command": "python -m mpremote exec \"import selftest; selftest.probe()\"",
       "problemMatcher": []
     },
     {
       "label": "Firmware: listar portas",
       "type": "shell",
-      "command": "mpremote connect list",
+      "command": "python -m mpremote connect list",
       "problemMatcher": []
     },
     {
@@ -64,13 +64,13 @@
     {
       "label": "MicroPython: apagar flash (modo boot)",
       "type": "shell",
-      "command": "esptool.py --chip esp32c3 --port ${input:porta} erase_flash",
+      "command": "python -m esptool --chip esp32c3 --port ${input:porta} erase_flash",
       "problemMatcher": []
     },
     {
       "label": "MicroPython: gravar interpretador (modo boot)",
       "type": "shell",
-      "command": "esptool.py --chip esp32c3 --port ${input:porta} write_flash -z 0x0 \"${input:binario}\"",
+      "command": "python -m esptool --chip esp32c3 --port ${input:porta} write_flash -z 0x0 \"${input:binario}\"",
       "problemMatcher": []
     },
     {
