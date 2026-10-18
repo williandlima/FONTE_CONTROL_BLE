@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Firmware: enviar tudo e reiniciar",
+      "type": "shell",
+      "command": "mpremote cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset",
+      "options": { "cwd": "${workspaceFolder}/firmware" },
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "Firmware: enviar arquivo aberto e reiniciar",
+      "type": "shell",
+      "command": "mpremote cp \"${file}\" : + reset",
+      "options": { "cwd": "${workspaceFolder}/firmware" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: REPL / log (sair com Ctrl+X)",
+      "type": "shell",
+      "command": "mpremote repl",
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated", "focus": true }
+    },
+    {
+      "label": "Firmware: autoteste loopback",
+      "type": "shell",
+      "command": "mpremote exec \"import selftest; selftest.loopback()\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: sondar fonte (probe)",
+      "type": "shell",
+      "command": "mpremote exec \"import selftest; selftest.probe()\"",
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: listar portas",
+      "type": "shell",
+      "command": "mpremote connect list",
+      "problemMatcher": []
+    },
+    {
+      "label": "Testes no PC (simulador)",
+      "type": "shell",
+      "command": "python -m unittest discover -s tests -v",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "test"
+    }
+  ]
+}
