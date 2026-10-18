@@ -1,0 +1,16 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- moldura da fonte -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFE8F5E9"
+        android:strokeWidth="4"
+        android:pathData="M30,36h48a4,4 0,0 1,4 4v28a4,4 0,0 1,-4 4h-48a4,4 0,0 1,-4 -4v-28a4,4 0,0 1,4 -4z" />
+    <!-- raio -->
+    <path
+        android:fillColor="#FF7CFC9A"
+        android:pathData="M58,40l-14,17h9l-5,11l14,-17h-9z" />
+</vector>
