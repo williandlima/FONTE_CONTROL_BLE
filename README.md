@@ -58,9 +58,11 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 2. Copie os arquivos:
    ```bash
    cd firmware
-   mpremote connect /dev/ttyACM0 cp config.py e3634a.py bridge.py ble_uart.py boot.py main.py : + reset
+   mpremote connect /dev/ttyACM0 cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset
    ```
-3. Para ver o log: `DEBUG = True` no `config.py` e `mpremote connect /dev/ttyACM0 repl`.
+3. Teste a fiação antes (loopback e sondagem da fonte): `import selftest` no REPL,
+   ver [docs/HARDWARE.md](docs/HARDWARE.md#roteiro-de-teste-nesta-ordem).
+4. Para ver o log: `DEBUG = True` no `config.py` e `mpremote connect /dev/ttyACM0 repl`.
 
 O dispositivo anuncia como **`E3634A-BLE`**.
 

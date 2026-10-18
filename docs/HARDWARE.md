@@ -13,6 +13,53 @@
 > As irmãs E3632A/E3633A usam o mesmo conjunto SCPI (mudam só os limites em
 > `firmware/e3634a.py` → `RANGES`).
 
+## Seu hardware (conferido pela foto)
+
+- **ESP32-C3 Super Mini**: GPIO21 e GPIO20 são os dois primeiros pinos da fileira
+  superior (lado oposto ao 5V); `3V3`, `G` e `5V` ficam juntos junto ao USB-C.
+- **Módulo RS-232 azul** (U1 de 16 pinos, capacitores C1–C5, LED D1, DB9 "9P"):
+  header de 4 pinos **GND, TX, RX, VCC** — só o canal 1 (T1/R1). Não existe
+  DTR/DSR no módulo, então `DTR_IN_PIN`/`DSR_OUT_PIN` ficam `None` e o
+  **jumper 4↔6 vai no conector do lado da fonte**.
+
+| Módulo | Super Mini |
+|---|---|
+| VCC | **3V3** (nunca 5V) |
+| GND | G |
+| TX | GPIO21 |
+| RX | GPIO20 |
+
+A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
+(`selftest.loopback()`, abaixo) e ele diz se precisa inverter os dois fios.
+
+### Três coisas a conferir antes de ligar na fonte
+
+1. **Marcação do chip U1.** Tem que ser **MAX3232** (ou SP3232/ST3232/
+   ADM3232). Se for **MAX232** puro, ele só funciona em 5V e a saída R1OUT
+   chegaria a 5V no GPIO20 do ESP32-C3 — não ligue.
+2. **Gênero e tipo do DB9.** Esses módulos costumam ser fiados como **DTE**
+   (igual a um PC: TXD no pino 3, RXD no pino 2). A E3634A também é DTE, então
+   entre as duas pontas o cabo precisa ser **null-modem (cruzado)**: 2↔3 e 5↔5.
+   Um cabo reto/extensor não funciona. Se os gêneros dos conectores não
+   encaixam, use um adaptador de gênero ou faça um cabo curto.
+3. **Jumper 4↔6 no conector da fonte** (ver abaixo). O módulo só leva os pinos
+   2, 3 e 5.
+
+### Roteiro de teste (nesta ordem)
+
+1. Só o módulo + ESP, **sem a fonte**: ponha um fio entre os pinos **2 e 3** do
+   DB9 do módulo e, no REPL (`mpremote connect /dev/ttyACM0 repl`):
+   ```python
+   import selftest
+   selftest.loopback()
+   ```
+   Deve imprimir `OK` para um dos sentidos e dizer se há fios invertidos.
+2. Ligue ao cabo null-modem com o jumper 4–6 na ponta da fonte, fonte em
+   `RS-232 / 9600 / NONE 8 BITS`, e rode `selftest.probe()`. Ele varre
+   baud/stop-bits/sentido até a fonte responder ao `*IDN?` e imprime os valores
+   para o `config.py`.
+3. Só então rode o `main.py` e use o app.
+
 ## Configuração RS-232 na fonte (painel frontal)
 
 No menu **I/O Config** da fonte selecione:
