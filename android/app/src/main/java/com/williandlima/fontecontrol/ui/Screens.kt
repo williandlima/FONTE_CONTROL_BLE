@@ -98,8 +98,8 @@ fun AppRoot(vm: PsuViewModel) {
                         Text(
                             when {
                                 ui.conn != ConnState.CONNECTED -> ui.conn.label()
-                                !ui.link -> "BLE ok - fonte sem resposta"
-                                else -> ui.idn ?: "Conectado"
+                                !ui.link -> "BLE ok - fonte sem resposta" + (ui.fw?.let { " · FW $it" } ?: "")
+                                else -> (ui.idn ?: "Conectado") + (ui.fw?.let { " · FW $it" } ?: "")
                             },
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
@@ -481,6 +481,10 @@ private fun MoreTab(vm: PsuViewModel, ui: UiState) {
     var text by rememberSaveable { mutableStateOf("") }
     var confirmReset by remember { mutableStateOf(false) }
     var lock by rememberSaveable { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val appVer = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
         Section("Display da fonte") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -527,7 +531,9 @@ private fun MoreTab(vm: PsuViewModel, ui: UiState) {
                     colors = ButtonDefaults.buttonColors(containerColor = AlarmColor)) { Text("*RST") }
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text(ui.idn ?: "-", style = MaterialTheme.typography.bodySmall)
+            Text("Fonte: ${ui.idn ?: "-"}", style = MaterialTheme.typography.bodySmall)
+            Text("Firmware da ponte: ${ui.fw ?: "-"}", style = MaterialTheme.typography.bodySmall)
+            Text("App: $appVer", style = MaterialTheme.typography.bodySmall)
         }
     }
     if (confirmReset) {

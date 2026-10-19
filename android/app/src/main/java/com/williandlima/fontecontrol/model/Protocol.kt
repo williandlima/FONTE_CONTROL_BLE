@@ -36,7 +36,7 @@ data class PsuSettings(
 }
 
 sealed interface Incoming {
-    data class Hello(val link: Boolean, val idn: String?, val pollMs: Int) : Incoming
+    data class Hello(val link: Boolean, val idn: String?, val pollMs: Int, val fw: String?) : Incoming
     data class Link(val ok: Boolean, val idn: String?, val err: String?) : Incoming
     data class Meas(val m: Measurement) : Incoming
     data class Status(val s: PsuSettings) : Incoming
@@ -62,7 +62,8 @@ object Protocol {
         }
         return when (o.optString("t")) {
             "hello" -> Incoming.Hello(
-                o.optBoolean("link"), o.optString("idn").ifEmpty { null }, o.optInt("poll", 500)
+                o.optBoolean("link"), o.optString("idn").ifEmpty { null }, o.optInt("poll", 500),
+                o.optString("fw").ifEmpty { null },
             )
             "link" -> Incoming.Link(
                 o.optBoolean("ok"),

@@ -46,6 +46,7 @@ Todos aceitam `"id"` opcional, devolvido na resposta.
 | `poll` | `ms`: 0 (desliga) ou ≥150 | intervalo da medição automática |
 | `link` | — | força nova tentativa de conexão com a fonte |
 | `ping` | — | — |
+| `version` | — | devolve a versão do firmware (`d`); funciona sem a fonte conectada |
 
 Exemplos:
 

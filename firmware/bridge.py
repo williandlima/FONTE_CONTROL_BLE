@@ -11,6 +11,9 @@ except ImportError:
     from e3634a import ticks_ms, ticks_diff
 
 
+FW_VERSION = "1.1.0"   # sobe a cada mudanca de firmware; aparece no app
+
+
 class CmdError(Exception):
     pass
 
@@ -65,7 +68,7 @@ class Bridge:
         self.client = connected
         if connected:
             self._t_link = None  # tenta (re)ligar a fonte imediatamente
-            m = {"t": "hello", "fw": "1.0", "link": self.link, "poll": self.poll_ms}
+            m = {"t": "hello", "fw": FW_VERSION, "link": self.link, "poll": self.poll_ms}
             if self.link:
                 m["idn"] = self.psu.idn
             self.emit(m)
@@ -188,6 +191,8 @@ class Bridge:
             return self.poll_ms
         if c == "ping":
             return "pong"
+        if c == "version":
+            return FW_VERSION
         if c == "link":
             if not self.try_link():
                 raise CmdError("sem resposta da fonte: " + self.last_err)

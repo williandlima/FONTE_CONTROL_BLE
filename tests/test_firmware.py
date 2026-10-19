@@ -246,6 +246,20 @@ class BridgeTest(unittest.TestCase):
         self.assertAlmostEqual(m[0]["i"], 0.5)
         self.assertTrue(m[0]["o"])
 
+    def test_version_command_works_without_link(self):
+        from bridge import FW_VERSION
+        self.br.link = False             # fonte fora do ar: ainda responde
+        r = self.cmd(cmd="version")
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["d"], FW_VERSION)
+
+    def test_hello_carries_firmware_version(self):
+        from bridge import FW_VERSION
+        self.out.clear()
+        self.br.on_client(True)
+        h = self.msgs("hello")[0]
+        self.assertEqual(h["fw"], FW_VERSION)
+
     def test_poll_min(self):
         r = self.cmd(cmd="poll", ms=10)
         self.assertEqual(r["d"], 150)

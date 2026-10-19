@@ -29,6 +29,7 @@ data class UiState(
     val conn: ConnState = ConnState.DISCONNECTED,
     val link: Boolean = false,
     val idn: String? = null,
+    val fw: String? = null,
     val settings: PsuSettings = PsuSettings(),
     val meas: Measurement? = null,
     val history: List<Measurement> = emptyList(),
@@ -62,9 +63,16 @@ class PsuViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { ble.lines.collect { onLine(it) } }
         viewModelScope.launch {
             ble.state.collect { s ->
-                _ui.update { it.copy(conn = s, link = if (s == ConnState.CONNECTED) it.link else false) }
+                _ui.update {
+                    it.copy(
+                        conn = s,
+                        link = if (s == ConnState.CONNECTED) it.link else false,
+                        fw = if (s == ConnState.CONNECTED) it.fw else null,
+                    )
+                }
                 if (s == ConnState.CONNECTED) {
                     log("BLE conectado")
+                    send("version")
                     send("status")
                 } else if (s == ConnState.DISCONNECTED) {
                     _ui.update { it.copy(busy = 0) }
@@ -150,7 +158,7 @@ class PsuViewModel(app: Application) : AndroidViewModel(app) {
     private fun onLine(line: String) {
         when (val msg = Protocol.parse(line)) {
             is Incoming.Hello -> _ui.update {
-                it.copy(link = msg.link, idn = msg.idn ?: it.idn,
+                it.copy(link = msg.link, idn = msg.idn ?: it.idn, fw = msg.fw ?: it.fw,
                     settings = it.settings.copy(pollMs = msg.pollMs))
             }
             is Incoming.Link -> {
@@ -163,10 +171,13 @@ class PsuViewModel(app: Application) : AndroidViewModel(app) {
             is Incoming.Resp -> {
                 val cmd = msg.id?.let { pending.remove(it) } ?: msg.cmd
                 _ui.update { it.copy(busy = pending.size) }
+                if (msg.ok && cmd == "version" && msg.data != null) {
+                    _ui.update { it.copy(fw = msg.data) }
+                }
                 if (!msg.ok) {
                     log("! $cmd: ${msg.err}")
                     toast(msg.err ?: "Erro")
-                } else if (msg.data != null && cmd != "poll") {
+                } else if (msg.data != null && cmd != "poll" && cmd != "version") {
                     log("< ${msg.data}")
                 }
             }
