@@ -9,6 +9,17 @@ from bridge import Bridge
 from ble_uart import BLEUART
 
 
+# Janela de seguranca: nos 3 s apos ligar, Ctrl+C no Thonny ou segurar BOOT
+# (GPIO9) interrompem o firmware e deixam o REPL livre para enviar arquivos.
+print("Janela de seguranca (3 s): Ctrl+C ou segure BOOT para ficar no REPL")
+_boot = Pin(9, Pin.IN, Pin.PULL_UP)
+for _ in range(30):
+    if _boot.value() == 0:
+        print("BOOT pressionado: firmware nao iniciado")
+        raise SystemExit
+    sleep_ms(100)
+
+
 def log(*a):
     if C.DEBUG:
         print(*a)

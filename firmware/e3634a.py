@@ -95,8 +95,10 @@ class E3634A:
         return True
 
     def _flush_input(self):
+        t0 = ticks_ms()
         while self._pull():
-            pass
+            if ticks_diff(ticks_ms(), t0) > 100:   # linha despejando dados sem parar
+                break
         self._rx = b""
 
     def _send(self, line):
@@ -134,12 +136,15 @@ class E3634A:
                     continue
                 self._dbg("<<", s)
                 return s
-            if self._pull():
-                continue
+            # o tempo limite vale mesmo com dados chegando (fluxo continuo/ruido)
             if ticks_diff(ticks_ms(), t0) > timeout_ms:
                 got, self._rx = self._rx, b""
-                # bytes sem '\n': lixo = baud/paridade errados; vazio = sem resposta
+                # bytes sem terminador: lixo = baud/paridade errados; vazio = sem resposta
                 raise LinkError("timeout rx=" + (repr(got[:16]) if got else "vazio"))
+            if self._pull():
+                if len(self._rx) > 256:            # nao deixar crescer sem limite
+                    self._rx = self._rx[-64:]
+                continue
             sleep_ms(2)
 
     def query(self, cmd, timeout_ms=None):

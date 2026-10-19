@@ -151,6 +151,41 @@ class ProtocolTest(unittest.TestCase):
         self.assertEqual(sim.log[:2], ["MEAS:VOLT:DC?", "MEAS:CURR:DC?"])
 
 
+class FloodUART:
+    """UART que despeja bytes sem parar e sem terminador (ruido/linha presa)."""
+
+    def __init__(self):
+        self.out = []
+
+    def write(self, d):
+        return len(d)
+
+    def any(self):
+        return 8
+
+    def read(self, n=-1):
+        return b"\x00\xff" * 4
+
+
+class FloodTest(unittest.TestCase):
+    def test_query_times_out_under_continuous_stream(self):
+        import time
+        psu = E3634A(FloodUART(), timeout_ms=150)
+        t0 = time.monotonic()
+        with self.assertRaises(LinkError) as cm:
+            psu.query("*IDN?")
+        self.assertLess(time.monotonic() - t0, 2.0)
+        self.assertIn("timeout rx=", str(cm.exception))
+
+    def test_connect_fails_fast_under_continuous_stream(self):
+        import time
+        psu = E3634A(FloodUART(), timeout_ms=150)
+        t0 = time.monotonic()
+        with self.assertRaises(LinkError):
+            psu.connect()
+        self.assertLess(time.monotonic() - t0, 3.0)
+
+
 class BridgeTest(unittest.TestCase):
     def setUp(self):
         self.sim = SimE3634A(load_ohm=10)
