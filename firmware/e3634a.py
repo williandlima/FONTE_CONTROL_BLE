@@ -96,8 +96,9 @@ class E3634A:
                     self._rx += d
                 continue
             if ticks_diff(ticks_ms(), t0) > timeout_ms:
-                self._rx = b""
-                raise LinkError("timeout")
+                got, self._rx = self._rx, b""
+                # bytes sem '\n': lixo = baud/paridade errados; vazio = sem resposta
+                raise LinkError("timeout rx=" + (repr(got[:16]) if got else "vazio"))
             sleep_ms(2)
 
     def query(self, cmd, timeout_ms=None):

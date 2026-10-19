@@ -67,6 +67,22 @@ class DriverTest(unittest.TestCase):
         with self.assertRaises(LinkError):
             self.psu.query("*IDN?")
 
+    def test_timeout_reports_rx(self):
+        self.sim.alive = False
+        with self.assertRaises(LinkError) as cm:
+            self.psu.query("*IDN?")
+        self.assertIn("vazio", str(cm.exception))
+        self.sim.alive = True
+        self.sim._out = b"\xff\xfe"          # lixo sem '\n' (baud errado)
+        self.psu._rx = b""
+        orig = self.sim.any
+        self.sim.any = lambda: 0              # nada novo; _rx fica vazio
+        self.psu._rx = b"\xff\xfe"
+        with self.assertRaises(LinkError) as cm:
+            self.psu._readline(50)
+        self.sim.any = orig
+        self.assertIn("xff", str(cm.exception))
+
     def test_display_text_truncated(self):
         self.psu.display_text('ola "mundo" 123456')
         self.assertEqual(len(self.sim.text), 12)
@@ -160,6 +176,12 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(self.br._retry_ms(), 12000)
         self.br._fails = 10
         self.assertEqual(self.br._retry_ms(), 30000)
+
+    def test_link_cmd_reports_reason(self):
+        self.sim.alive = False
+        r = self.cmd(cmd="link")
+        self.assertFalse(r["ok"])
+        self.assertIn("timeout", r["err"])
 
     def test_bad_json(self):
         self.out.clear()

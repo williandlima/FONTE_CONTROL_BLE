@@ -43,6 +43,7 @@ class Bridge:
         self._t_link = None
         self._need_status = False
         self._fails = 0
+        self.last_err = ""
 
     # -------------------------------------------------------------- saida
     def emit(self, obj):
@@ -79,6 +80,7 @@ class Bridge:
             self.psu.connect(self.lock_panel)
         except (LinkError, SCPIError) as e:
             self._fails += 1
+            self.last_err = str(e)
             self._set_link(False, str(e))
             return False
         self._fails = 0
@@ -177,7 +179,9 @@ class Bridge:
         if c == "ping":
             return "pong"
         if c == "link":
-            return self.try_link()
+            if not self.try_link():
+                raise CmdError("sem resposta da fonte: " + self.last_err)
+            return True
 
         self._require_link()
         vmax, imax = self._lim()
