@@ -52,7 +52,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port")
     ap.add_argument("--baud", type=int, default=9600)
-    ap.add_argument("--stop", type=int, default=2, choices=(1, 2))
+    ap.add_argument("--stop", type=int, default=1, choices=(1, 2))
     ap.add_argument("--dsrdtr", action="store_true", help="handshake DTR/DSR no PC")
     ap.add_argument("--sim", action="store_true")
     ap.add_argument("-v", action="store_true", help="mostra o trafego SCPI")

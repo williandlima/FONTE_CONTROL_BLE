@@ -86,15 +86,25 @@ A fonte salva isso em memória não volátil.
                                                           └───────────────────────────┘
 ```
 
-### Por que o jumper 4 ↔ 6 (DTR → DSR)?
+### Parâmetros RS-232 e controle de fluxo
 
-A E363x usa handshake por hardware **DTR/DSR**: ela **só transmite** se a linha
-**DSR (pino 6)** estiver ativa. Sem isso a fonte recebe e executa os comandos,
-mas **nunca responde às queries** (sintoma: `timeout` / LED do ESP piscando
-rápido, display da fonte mostrando `RMT`).
+O firmware usa o mesmo método validado na bancada com esta fonte:
 
-Ligando o DTR da própria fonte (pino 4) no DSR (pino 6), o DSR fica ativo
-sempre que ela está pronta. É o método recomendado e é o padrão do firmware.
+- **9600 baud, 8N1** (8 bits, sem paridade, 1 stop bit)
+- **XON/XOFF** por software, tratado pelo driver (o `machine.UART` do MicroPython
+  não tem esse recurso): bytes `0x13` (XOFF) pausam o envio e `0x11` (XON) liberam;
+  os dois são removidos das respostas
+- comandos terminados em **`\r\n`**; a leitura aceita `\n` ou `\r`
+- abertura de sessão: espera 0,3 s, `*CLS`, esvazia `SYST:ERR?` (no máximo 20
+  leituras) e só então `*IDN?`; com a fila de erros vazia a fonte não apita
+- 3 falhas seguidas de resposta antes de marcar a fonte como sem comunicação
+
+### Jumper 4 ↔ 6 (DTR → DSR): mantenha como precaução
+
+Com XON/XOFF o jumper normalmente não é necessário, mas **não atrapalha**: se o
+seu exemplar da fonte também exigir o handshake por hardware (DSR ativo para
+transmitir), é ele que libera as respostas. Se a fonte aceita os comandos (display
+em `RMT`) mas nunca responde, confira primeiro o jumper e o cruzamento 2↔3.
 
 ### Opcional: handshake completo com o 2º canal do MAX3232
 

@@ -411,7 +411,7 @@ private fun ChartTab(vm: PsuViewModel, ui: UiState) {
         }
         Section("Taxa de leitura") {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                for (ms in listOf(200, 500, 1000, 2000)) FilterChip(
+                for (ms in listOf(300, 500, 1000, 2000)) FilterChip(
                     selected = ui.settings.pollMs == ms,
                     onClick = { vm.poll(ms); vm.refresh() },
                     label = { Text("${ms}ms") })

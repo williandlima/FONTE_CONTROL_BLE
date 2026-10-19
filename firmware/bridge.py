@@ -43,6 +43,7 @@ class Bridge:
         self._t_link = None
         self._need_status = False
         self._fails = 0
+        self._errs = 0              # falhas seguidas com o link ativo
         self.last_err = ""
 
     # -------------------------------------------------------------- saida
@@ -75,6 +76,16 @@ class Bridge:
         # serial errada faz a fonte apitar, entao nao insistir a cada 3 s
         return min(self.reconnect_ms << min(self._fails, 4), max(self.reconnect_ms, 30000))
 
+    def _link_error(self, e, now=None):
+        """Falha transitoria nao derruba o link: so 3 seguidas marcam erro."""
+        self._errs += 1
+        if self._errs >= 3:
+            self._errs = 0
+            self._fails = 0
+            self.last_err = str(e)
+            self._set_link(False, str(e))
+            self._t_link = ticks_ms() if now is None else now
+
     def try_link(self):
         try:
             self.psu.connect(self.lock_panel)
@@ -84,6 +95,7 @@ class Bridge:
             self._set_link(False, str(e))
             return False
         self._fails = 0
+        self._errs = 0
         self.link = False
         self._set_link(True)
         self._need_status = True
@@ -107,14 +119,13 @@ class Bridge:
                 self._t_poll = now
                 self.send_measure()
         except LinkError as e:
-            self._fails = 0
-            self._set_link(False, str(e))
-            self._t_link = now
+            self._link_error(e, now)
         except SCPIError as e:
             self.emit({"t": "e", "code": e.code, "msg": e.msg})
 
     def send_measure(self):
         v, i, out, ovp_t, ocp_t = self.psu.measure()
+        self._errs = 0
         self.emit({"t": "m", "v": v, "i": i, "o": out,
                    "ovp_t": ovp_t, "ocp_t": ocp_t})
 
@@ -153,8 +164,7 @@ class Bridge:
                  "code": e.code}
             self._need_status = True
         except LinkError as e:
-            self._set_link(False, str(e))
-            self._t_link = ticks_ms()
+            self._link_error(e)
             r = {"t": "r", "ok": False, "err": "sem resposta da fonte"}
         if rid is not None:
             r["id"] = rid

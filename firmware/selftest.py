@@ -61,18 +61,17 @@ def _read_for(u, ms):
     return buf
 
 
-def probe(bauds=(9600, 19200, 4800, 2400, 1200), stops=(2, 1)):
+def probe(bauds=(9600, 19200, 4800, 2400, 1200), stops=(1, 2)):
     """Com a fonte ligada, procura baud/stop/sentido de TX-RX em que ela responde."""
     for tx, rx in ((TX, RX), (RX, TX)):
         for baud in bauds:
             for stop in stops:
                 u = _uart(tx, rx, baud, stop)
                 _drain(u)
-                u.write(b"\n")
-                sleep_ms(50)
-                u.write(b"SYST:REM\n")
+                sleep_ms(300)
+                u.write(b"*CLS\r\n")
                 sleep_ms(100)
-                u.write(b"*IDN?\n")
+                u.write(b"*IDN?\r\n")
                 d = _read_for(u, 700)
                 u.deinit()
                 print("TX=%d RX=%d baud=%d stop=%d -> %r" % (tx, rx, baud, stop, d))

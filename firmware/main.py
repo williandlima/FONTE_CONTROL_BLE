@@ -29,7 +29,7 @@ if C.DSR_OUT_PIN is not None:
 dtr_in = Pin(C.DTR_IN_PIN, Pin.IN) if C.DTR_IN_PIN is not None else None
 
 psu = E3634A(uart, timeout_ms=C.TIMEOUT_MS, compound=C.COMPOUND_QUERY,
-             dtr_in=dtr_in, log=log if C.DEBUG else None)
+             dtr_in=dtr_in, log=log if C.DEBUG else None, xonxoff=C.XONXOFF)
 ble = BLEUART(C.BLE_NAME)
 bridge = Bridge(psu, ble.send_line, poll_ms=C.POLL_MS, poll_min_ms=C.POLL_MIN_MS,
                 reconnect_ms=C.RECONNECT_MS, lock_panel=C.LOCK_FRONT_PANEL)

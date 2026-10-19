@@ -1,6 +1,14 @@
 # Driver SCPI para a fonte Agilent/Keysight E3634A via RS-232.
 # Compativel com MicroPython (machine.UART) e CPython (pyserial via adaptador
 # ou simulador), pois so usa write()/read()/any() do objeto uart.
+#
+# Metodo de comunicacao (o mesmo validado na bancada com esta fonte):
+#   - 8N1, 9600 baud, controle de fluxo XON/XOFF por software
+#   - escrita termina em "\r\n"; leitura aceita "\n" ou "\r"
+#   - sessao: espera 0,3 s, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
+#     (a fila de erros vazia evita o beep da fonte)
+#   - _write NAO limpa a entrada (evita -410 Query INTERRUPTED); so a query limpa
+#   - medicao: MEAS:VOLT:DC?, 50 ms, MEAS:CURR:DC?
 
 try:
     from time import ticks_ms, ticks_diff, sleep_ms
@@ -50,13 +58,19 @@ def _b(s):
 
 
 class E3634A:
-    def __init__(self, uart, timeout_ms=2500, compound=True, dtr_in=None, log=None):
+    def __init__(self, uart, timeout_ms=2500, compound=False, dtr_in=None, log=None,
+                 xonxoff=True, state_every=5):
         self.uart = uart
         self.timeout_ms = timeout_ms
         self.compound = compound
         self.dtr_in = dtr_in  # objeto Pin (entrada) ou None
         self.log = log
+        self.xonxoff = xonxoff
+        self.state_every = state_every
         self._rx = b""
+        self._paused = False      # fonte mandou XOFF: nao transmitir
+        self._state = (False, False, False)
+        self._state_n = 0
         self.idn = ""
 
     # ------------------------------------------------------------ baixo nivel
@@ -64,10 +78,26 @@ class E3634A:
         if self.log:
             self.log(*a)
 
+    def _pull(self):
+        """Move bytes da UART para _rx, tratando XON (0x11) / XOFF (0x13)."""
+        n = self.uart.any()
+        if not n:
+            return False
+        d = self.uart.read(n)
+        if not d:
+            return False
+        if self.xonxoff:
+            a, b = d.rfind(b"\x11"), d.rfind(b"\x13")
+            if a >= 0 or b >= 0:
+                self._paused = b > a
+                d = d.replace(b"\x11", b"").replace(b"\x13", b"")
+        self._rx += d
+        return True
+
     def _flush_input(self):
+        while self._pull():
+            pass
         self._rx = b""
-        while self.uart.any():
-            self.uart.read()
 
     def _send(self, line):
         if self.dtr_in is not None:
@@ -76,24 +106,35 @@ class E3634A:
                 if ticks_diff(ticks_ms(), t0) > self.timeout_ms:
                     raise LinkError("DTR da fonte inativo")
                 sleep_ms(2)
+        if self.xonxoff:
+            self._pull()                      # pega XOFF/XON ainda na fila da UART
+        if self._paused:                      # XOFF recebido: esperar o XON
+            t0 = ticks_ms()
+            while self._paused:
+                self._pull()
+                if ticks_diff(ticks_ms(), t0) > self.timeout_ms:
+                    raise LinkError("fonte em XOFF")
+                sleep_ms(2)
         self._dbg(">>", line)
-        self.uart.write(line.encode() + b"\n")
+        self.uart.write(line.encode() + b"\r\n")
 
     def _readline(self, timeout_ms=None):
         timeout_ms = self.timeout_ms if timeout_ms is None else timeout_ms
         t0 = ticks_ms()
         while True:
-            i = self._rx.find(b"\n")
+            i = -1
+            for k, c in enumerate(self._rx):   # primeiro \n ou \r
+                if c == 10 or c == 13:
+                    i = k
+                    break
             if i >= 0:
                 line, self._rx = self._rx[:i], self._rx[i + 1:]
-                s = line.decode().strip("\r\n \x00")
+                s = line.decode().strip(" \x00")
+                if not s:                      # sobra do \r\n: ignorar
+                    continue
                 self._dbg("<<", s)
                 return s
-            n = self.uart.any()
-            if n:
-                d = self.uart.read(n)
-                if d:
-                    self._rx += d
+            if self._pull():
                 continue
             if ticks_diff(ticks_ms(), t0) > timeout_ms:
                 got, self._rx = self._rx, b""
@@ -107,14 +148,17 @@ class E3634A:
         return self._readline(timeout_ms)
 
     def write(self, cmd, check=True):
-        """Envia comando. Com check=True le SYST:ERR? (sincroniza e valida)."""
-        self._flush_input()
+        """Envia comando. Com check=True le SYST:ERR? (sincroniza e valida).
+
+        Nao limpa a entrada: descartar uma resposta em transito faria a fonte
+        acusar -410 Query INTERRUPTED e apitar. Quem limpa e a query()."""
         self._send(cmd)
+        self._state_n = 0                   # estado em cache pode ter mudado
         if check:
             self.check_error()
 
-    def read_error(self):
-        r = self.query("SYST:ERR?")
+    def read_error(self, timeout_ms=None):
+        r = self.query("SYST:ERR?", timeout_ms)
         code, _, msg = r.partition(",")
         try:
             code = int(code)
@@ -122,10 +166,10 @@ class E3634A:
             raise LinkError("resposta invalida: %r" % r)
         return code, msg.strip().strip('"')
 
-    def errors(self):
+    def errors(self, timeout_ms=None):
         out = []
         for _ in range(20):
-            code, msg = self.read_error()
+            code, msg = self.read_error(timeout_ms)
             if code == 0:
                 break
             out.append((code, msg))
@@ -138,15 +182,16 @@ class E3634A:
 
     # --------------------------------------------------------------- sessao
     def connect(self, lock_panel=False):
+        self._paused = False
         self._flush_input()
-        self.uart.write(b"\n")  # descarta lixo parcial no buffer da fonte
-        sleep_ms(50)
-        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
-        sleep_ms(50)
+        sleep_ms(300)                       # porta/fonte estabilizam
         self.write("*CLS", check=False)
+        self.errors(1200)                   # esvazia a fila: sem beep
         self.idn = self.query("*IDN?", 1200)
         if not self.idn:
             raise LinkError("IDN vazio")
+        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
+        self._state_n = 0                   # forca releitura do estado
         return self.idn
 
     def ping(self):
@@ -207,26 +252,32 @@ class E3634A:
 
     # ------------------------------------------------------------ medicao
     def measure_voltage(self):
-        return _f(self.query("MEAS:VOLT?"))
+        return _f(self.query("MEAS:VOLT:DC?"))
 
     def measure_current(self):
-        return _f(self.query("MEAS:CURR?"))
+        return _f(self.query("MEAS:CURR:DC?"))
 
     def measure(self):
         """Retorna (V, I, saida_on, ovp_trip, ocp_trip)."""
         if self.compound:
             r = self.query(
-                "MEAS:VOLT?;:MEAS:CURR?;:OUTP?;:VOLT:PROT:TRIP?;:CURR:PROT:TRIP?"
+                "MEAS:VOLT:DC?;:MEAS:CURR:DC?;:OUTP?;:VOLT:PROT:TRIP?;:CURR:PROT:TRIP?"
             )
             p = r.split(";")
             if len(p) != 5:
                 raise LinkError("resposta composta invalida: %r" % r)
             return _f(p[0]), _f(p[1]), _b(p[2]), _b(p[3]), _b(p[4])
         v = self.measure_voltage()
+        sleep_ms(50)
         i = self.measure_current()
-        return (v, i, self.output_state(),
-                _b(self.query("VOLT:PROT:TRIP?")),
-                _b(self.query("CURR:PROT:TRIP?")))
+        # saida/protecoes mudam raramente: reler a cada state_every leituras
+        if self._state_n <= 0:
+            self._state = (self.output_state(),
+                           _b(self.query("VOLT:PROT:TRIP?")),
+                           _b(self.query("CURR:PROT:TRIP?")))
+            self._state_n = self.state_every
+        self._state_n -= 1
+        return (v, i) + self._state
 
     # ---------------------------------------------------------- protecoes
     def set_ovp(self, level=None, enabled=None):

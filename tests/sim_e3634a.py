@@ -11,9 +11,10 @@ RANGES = {"P25V": (25.75, 7.21), "P50V": (51.5, 4.12)}
 
 
 class SimE3634A:
-    def __init__(self, load_ohm=10.0, compound_ok=True):
+    def __init__(self, load_ohm=10.0, compound_ok=True, flow=False):
         self.load = load_ohm
         self.compound_ok = compound_ok
+        self.flow = flow          # responde envolvendo XOFF/XON, como a fonte real
         self.alive = True
         self.remote = False
         self._in = b""
@@ -102,7 +103,10 @@ class SimE3634A:
             if a is not None:
                 answers.append(a)
         if answers:
-            self._out += (";".join(answers) + "\r\n").encode()
+            resp = (";".join(answers) + "\r\n").encode()
+            if self.flow:
+                resp = b"\x13" + resp[:3] + b"\x11" + resp[3:]
+            self._out += resp
 
     @staticmethod
     def _onoff(arg):
@@ -152,14 +156,14 @@ class SimE3634A:
         if h == "SYST:LOC":
             self.remote = False
             return None
-        if not self.remote:
-            self._err(-221, "Settings conflict")   # comportamento sem SYST:REM
-            return None
         if h == "SYST:ERR?":
             if self.errq:
                 c, m = self.errq.pop(0)
                 return '%+d,"%s"' % (c, m)
             return '+0,"No error"'
+        if not self.remote:
+            self._err(-221, "Settings conflict")   # comportamento sem SYST:REM
+            return None
         if h == "SYST:VERS?":
             return "1994.0"
         if h == "SYST:BEEP":
@@ -203,9 +207,9 @@ class SimE3634A:
             return None
         if h == "OUTP?":
             return "1" if self.out else "0"
-        if h == "MEAS:VOLT?":
+        if h in ("MEAS:VOLT?", "MEAS:VOLT:DC?"):
             return fe(self._vi()[0])
-        if h == "MEAS:CURR?":
+        if h in ("MEAS:CURR?", "MEAS:CURR:DC?"):
             return fe(self._vi()[1])
         if h == "VOLT:PROT":
             self.ovp = float(arg)

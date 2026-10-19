@@ -89,6 +89,68 @@ class DriverTest(unittest.TestCase):
         self.assertNotIn('"', self.sim.text)
 
 
+class ProtocolTest(unittest.TestCase):
+    def test_terminator_crlf_and_session_sequence(self):
+        sim = SimE3634A()
+        psu = E3634A(sim, timeout_ms=200)
+        psu.connect()
+        self.assertEqual(sim.log[:3], ["*CLS", "SYST:ERR?", "*IDN?"])
+        self.assertEqual(sim.log[3], "SYST:REM")
+
+    def test_writes_end_with_crlf(self):
+        sim = SimE3634A()
+        raw = []
+        orig = sim.write
+        sim.write = lambda d: (raw.append(d), orig(d))[1]
+        psu = E3634A(sim, timeout_ms=200)
+        psu.connect()
+        self.assertTrue(all(d.endswith(b"\r\n") for d in raw))
+
+    def test_xonxoff_stripped_from_replies(self):
+        sim = SimE3634A(flow=True)
+        psu = E3634A(sim, timeout_ms=200)
+        self.assertIn("E3634A", psu.connect())
+        psu.apply(5.0, 1.0)
+        psu.output(True)
+        self.assertAlmostEqual(psu.measure()[0], 5.0)
+
+    def test_xoff_without_xon_blocks_send(self):
+        sim = SimE3634A()
+        psu = E3634A(sim, timeout_ms=100)
+        psu.connect()
+        sim._out += b"\x13"            # XOFF chega e nao vem XON
+        with self.assertRaises(LinkError) as cm:
+            psu.write("SYST:BEEP", check=False)
+        self.assertIn("XOFF", str(cm.exception))
+        sim._out += b"\x11"            # XON libera
+        psu.write("SYST:BEEP", check=False)
+
+    def test_measure_state_cached_and_invalidated(self):
+        sim = SimE3634A()
+        psu = E3634A(sim, timeout_ms=200, state_every=3)
+        psu.connect()
+        sim.log.clear()
+        psu.measure()
+        n1 = len(sim.log)
+        sim.log.clear()
+        psu.measure()
+        n2 = len(sim.log)
+        self.assertEqual(n1, 5)      # V, I + 3 de estado
+        self.assertEqual(n2, 2)      # so V e I
+        psu.output(True)
+        sim.log.clear()
+        psu.measure()
+        self.assertEqual(len(sim.log), 5)
+
+    def test_measure_uses_dc_queries(self):
+        sim = SimE3634A()
+        psu = E3634A(sim, timeout_ms=200)
+        psu.connect()
+        sim.log.clear()
+        psu.measure()
+        self.assertEqual(sim.log[:2], ["MEAS:VOLT:DC?", "MEAS:CURR:DC?"])
+
+
 class BridgeTest(unittest.TestCase):
     def setUp(self):
         self.sim = SimE3634A(load_ohm=10)
@@ -155,6 +217,11 @@ class BridgeTest(unittest.TestCase):
 
     def test_link_lost_and_recovered(self):
         self.sim.alive = False
+        # falhas transitorias: o link so cai na 3a falha seguida
+        for n in range(2):
+            r = self.cmd(cmd="out", on=True)
+            self.assertFalse(r["ok"])
+            self.assertTrue(self.br.link, "caiu cedo demais (falha %d)" % (n + 1))
         r = self.cmd(cmd="out", on=True)
         self.assertFalse(r["ok"])
         self.assertFalse(self.br.link)
@@ -167,6 +234,17 @@ class BridgeTest(unittest.TestCase):
         self.br.tick()
         self.assertTrue(self.br.link)
         self.assertTrue(self.sim.remote)
+
+    def test_good_reply_resets_error_count(self):
+        self.sim.alive = False
+        self.cmd(cmd="out", on=True)
+        self.cmd(cmd="out", on=True)
+        self.sim.alive = True
+        self.cmd(cmd="meas")             # leitura boa zera o contador
+        self.sim.alive = False
+        self.cmd(cmd="out", on=True)
+        self.cmd(cmd="out", on=True)
+        self.assertTrue(self.br.link)
 
     def test_retry_backoff(self):
         self.br.reconnect_ms = 3000
