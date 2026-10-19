@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" font-family="Arial, Helvetica, sans-serif">
+<rect width="1000" height="620" fill="#ffffff"/>
+<text x="500" y="30" text-anchor="middle" font-size="22" font-weight="bold" fill="#111">ESP32-C3 Super Mini - pinagem usada no projeto</text>
+<text x="500" y="52" text-anchor="middle" font-size="14" fill="#555">Vista de cima, USB-C à direita (mesma orientação da foto da placa)</text>
+<rect x="200" y="190" width="560" height="150" rx="10" fill="#1b1b1b" stroke="#000" stroke-width="2"/>
+<rect x="740" y="225" width="60" height="80" rx="8" fill="#c9c9c9" stroke="#666" stroke-width="2"/>
+<text x="770" y="270" text-anchor="middle" font-size="13" fill="#222">USB-C</text>
+<rect x="370" y="235" width="70" height="60" rx="4" fill="#2c2c2c" stroke="#777"/>
+<text x="405" y="272" text-anchor="middle" font-size="22" fill="#e8e8e8" font-weight="bold">C3</text>
+<rect x="640" y="225" width="26" height="26" rx="3" fill="#555" stroke="#aaa"/>
+<text x="676" y="243" font-size="12" fill="#ddd">BOOT</text>
+<rect x="640" y="275" width="26" height="26" rx="3" fill="#555" stroke="#aaa"/>
+<text x="676" y="293" font-size="12" fill="#ddd">RST</text>
+<circle cx="470" cy="300" r="5" fill="#4aa3ff"/><text x="482" y="304" font-size="12" fill="#ddd">LED (GPIO8)</text>
+<circle cx="235" cy="203" r="11" fill="#ff9800" stroke="#333" stroke-width="2"/>
+<text x="235" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">21</text>
+<circle cx="305" cy="203" r="11" fill="#2196f3" stroke="#333" stroke-width="2"/>
+<text x="305" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">20</text>
+<circle cx="375" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="375" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">10</text>
+<circle cx="445" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="445" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">9</text>
+<circle cx="515" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="515" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">8</text>
+<circle cx="585" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="585" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">7</text>
+<circle cx="655" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="655" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">6</text>
+<circle cx="725" cy="203" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="725" y="183" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">5</text>
+<circle cx="235" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="235" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">0</text>
+<circle cx="305" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="305" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">1</text>
+<circle cx="375" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="375" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">2</text>
+<circle cx="445" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="445" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">3</text>
+<circle cx="515" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="515" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">4</text>
+<circle cx="585" cy="327" r="11" fill="#e53935" stroke="#333" stroke-width="2"/>
+<text x="585" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">3V3</text>
+<circle cx="655" cy="327" r="11" fill="#212121" stroke="#333" stroke-width="2"/>
+<text x="655" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">G</text>
+<circle cx="725" cy="327" r="11" fill="#d4af37" stroke="#333" stroke-width="2"/>
+<text x="725" y="359" text-anchor="middle" font-size="16" font-weight="bold" fill="#111">5V</text>
+<line x1="235" y1="166" x2="200" y2="133" stroke="#ff9800" stroke-width="3"/>
+<rect x="65" y="75" width="190" height="58" rx="8" fill="#fff" stroke="#ff9800" stroke-width="3"/>
+<text x="160" y="99" text-anchor="middle" font-size="16" font-weight="bold" fill="#ff9800">GPIO21 (TX)</text>
+<text x="160" y="120" text-anchor="middle" font-size="14" fill="#222">→ pino TX do módulo</text>
+<line x1="305" y1="166" x2="345" y2="133" stroke="#2196f3" stroke-width="3"/>
+<rect x="285" y="75" width="190" height="58" rx="8" fill="#fff" stroke="#2196f3" stroke-width="3"/>
+<text x="380" y="99" text-anchor="middle" font-size="16" font-weight="bold" fill="#2196f3">GPIO20 (RX)</text>
+<text x="380" y="120" text-anchor="middle" font-size="14" fill="#222">← pino RX do módulo</text>
+<line x1="585" y1="368" x2="555" y2="425" stroke="#e53935" stroke-width="3"/>
+<rect x="470" y="425" width="150" height="58" rx="8" fill="#fff" stroke="#e53935" stroke-width="3"/>
+<text x="545" y="449" text-anchor="middle" font-size="16" font-weight="bold" fill="#e53935">3V3</text>
+<text x="545" y="470" text-anchor="middle" font-size="14" fill="#222">→ VCC do módulo</text>
+<line x1="655" y1="368" x2="700" y2="425" stroke="#212121" stroke-width="3"/>
+<rect x="640" y="425" width="150" height="58" rx="8" fill="#fff" stroke="#212121" stroke-width="3"/>
+<text x="715" y="449" text-anchor="middle" font-size="16" font-weight="bold" fill="#212121">G (GND)</text>
+<text x="715" y="470" text-anchor="middle" font-size="14" fill="#222">→ GND do módulo</text>
+<text x="705" y="396" font-size="12" fill="#b00">5V: não usar no MAX3232</text>
+<rect x="40" y="510" width="920" height="90" rx="8" fill="#f4f6f8" stroke="#bbb"/>
+<text x="60" y="538" font-size="15" font-weight="bold" fill="#111">Ligação com o módulo MAX3232 (header de 4 pinos: GND, TX, RX, VCC)</text>
+<text x="60" y="562" font-size="14" fill="#222">VCC → 3V3</text><text x="220" y="562" font-size="14" fill="#222">GND → G</text><text x="360" y="562" font-size="14" fill="#222">TX → GPIO21</text><text x="520" y="562" font-size="14" fill="#222">RX → GPIO20</text>
+<text x="60" y="584" font-size="13" fill="#555">Se o selftest.loopback() não ecoar, inverta só os fios TX e RX (GPIO21 ↔ GPIO20). Nunca ligue o VCC do módulo no 5V.</text>
+</svg>
