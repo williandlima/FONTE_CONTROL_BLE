@@ -42,6 +42,7 @@ class Bridge:
         self._t_poll = 0
         self._t_link = None
         self._need_status = False
+        self._fails = 0
 
     # -------------------------------------------------------------- saida
     def emit(self, obj):
@@ -68,12 +69,19 @@ class Bridge:
             self.emit(m)
             self._need_status = self.link
 
+    def _retry_ms(self):
+        # recuo progressivo (3s, 6s, 12s, ... ate 30s): cada tentativa com a
+        # serial errada faz a fonte apitar, entao nao insistir a cada 3 s
+        return min(self.reconnect_ms << min(self._fails, 4), max(self.reconnect_ms, 30000))
+
     def try_link(self):
         try:
             self.psu.connect(self.lock_panel)
         except (LinkError, SCPIError) as e:
+            self._fails += 1
             self._set_link(False, str(e))
             return False
+        self._fails = 0
         self.link = False
         self._set_link(True)
         self._need_status = True
@@ -83,7 +91,7 @@ class Bridge:
         """Chamar periodicamente no loop principal."""
         now = ticks_ms()
         if not self.link:
-            if self._t_link is None or ticks_diff(now, self._t_link) >= self.reconnect_ms:
+            if self._t_link is None or ticks_diff(now, self._t_link) >= self._retry_ms():
                 self._t_link = now
                 self.try_link()
             return
@@ -97,6 +105,7 @@ class Bridge:
                 self._t_poll = now
                 self.send_measure()
         except LinkError as e:
+            self._fails = 0
             self._set_link(False, str(e))
             self._t_link = now
         except SCPIError as e:

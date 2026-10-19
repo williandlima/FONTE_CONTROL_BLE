@@ -152,6 +152,15 @@ class BridgeTest(unittest.TestCase):
         self.assertTrue(self.br.link)
         self.assertTrue(self.sim.remote)
 
+    def test_retry_backoff(self):
+        self.br.reconnect_ms = 3000
+        self.br._fails = 0
+        self.assertEqual(self.br._retry_ms(), 3000)
+        self.br._fails = 2
+        self.assertEqual(self.br._retry_ms(), 12000)
+        self.br._fails = 10
+        self.assertEqual(self.br._retry_ms(), 30000)
+
     def test_bad_json(self):
         self.out.clear()
         self.br.handle_line("{nao json")
