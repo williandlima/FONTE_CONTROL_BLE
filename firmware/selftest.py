@@ -82,3 +82,86 @@ def probe(bauds=(9600, 19200, 4800, 2400, 1200), stops=(1, 2)):
     print("\nSem resposta. Verifique: jumper 4-6 na fonte, cabo null-modem "
           "(2<->3 cruzado), e se a fonte esta em RS-232 (nao HPIB).")
     return None
+
+
+def _rx_idle(samples=200, ms=2):
+    from machine import Pin
+    p = Pin(RX, Pin.IN)
+    hi = 0
+    for _ in range(samples):
+        hi += p.value()
+        sleep_ms(ms)
+    return hi, samples
+
+
+def beep():
+    """Testa so o caminho ESP -> fonte: manda SYST:REM e SYST:BEEP.
+
+    Se a fonte mostrar RMT e apitar UMA vez, os comandos chegam e o problema esta
+    no caminho de volta (fonte -> ESP). Se nada acontecer, o problema e na ida."""
+    u = _uart(TX, RX)
+    _drain(u)
+    u.write(b"SYST:REM\r\n")
+    sleep_ms(400)
+    u.write(b"SYST:BEEP\r\n")
+    sleep_ms(400)
+    u.deinit()
+    print("Enviado. Olhe a fonte: RMT no display? apitou uma vez?")
+
+
+def diag():
+    """Diagnostico completo da serial com a fonte ligada (pare o main com Stop)."""
+    print("== 1) nivel ocioso do RX (GPIO%d), esperado ALTO ==" % RX)
+    hi, n = _rx_idle()
+    print("   alto em %d de %d leituras" % (hi, n))
+    if hi == n:
+        print("   OK")
+    elif hi == 0:
+        print("   BAIXO fixo: modulo sem 3V3/GND, fio do RX solto ou linha da fonte em break")
+    else:
+        print("   oscilando: chegam dados/ruido sem pedir nada")
+
+    print("== 2) escuta passiva de 1,5 s ==")
+    u = _uart(TX, RX)
+    _drain(u)
+    got = _read_for(u, 1500)
+    u.deinit()
+    print("   recebido:", got if got else "nada")
+
+    print("== 3) *IDN? em varias configuracoes ==")
+    best = None
+    seen = False
+    combos = []
+    for tx, rx in ((TX, RX), (RX, TX)):
+        for stop in (1, 2):
+            for eol in (b"\r\n", b"\n"):
+                combos.append((tx, rx, 9600, stop, eol))
+    for baud in (19200, 4800, 2400, 1200):
+        combos.append((TX, RX, baud, 1, b"\r\n"))
+    for tx, rx, baud, stop, eol in combos:
+        u = _uart(tx, rx, baud, stop)
+        _drain(u)
+        sleep_ms(200)
+        u.write(b"*CLS" + eol)
+        sleep_ms(100)
+        u.write(b"*IDN?" + eol)
+        d = _read_for(u, 800)
+        u.deinit()
+        if d:
+            seen = True
+        print("   TX=%d RX=%d %d baud stop=%d eol=%r -> %r" % (tx, rx, baud, stop, eol, d))
+        if b"HEWLETT" in d or b"AGILENT" in d.upper() or b"E36" in d:
+            best = (tx, rx, baud, stop, eol)
+            break
+
+    print("== resultado ==")
+    if best:
+        print("A fonte respondeu. Use no config.py: UART_TX=%d UART_RX=%d BAUD=%d STOP=%d (terminador %r)" % best)
+    elif seen:
+        print("A fonte devolve bytes, mas nao um *IDN? valido: velocidade, paridade ou "
+              "formato diferentes. Confira I/O Config da fonte (RS-232, 9600, NONE 8 BITS).")
+    else:
+        print("Mudo em todas as combinacoes. Rode selftest.beep(): se a fonte mostrar RMT/apitar, "
+              "falta so o caminho de volta (pino 3 da fonte, GND, fio do RX, handshake). "
+              "Se nao reagir, falta o caminho de ida (cabo cruzado 2<->3, fio do TX).")
+    return best

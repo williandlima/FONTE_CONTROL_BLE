@@ -45,6 +45,26 @@ A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
 3. **Jumper 4↔6 no conector da fonte** (ver abaixo). O módulo só leva os pinos
    2, 3 e 5.
 
+### Diagnóstico automático da serial
+
+Com a fonte ligada e o `main.py` parado (**Stop** no Thonny), no Shell:
+
+```python
+import selftest
+selftest.diag()     # nível do RX, escuta passiva e *IDN? em várias configurações
+selftest.beep()     # só o caminho ESP -> fonte: a fonte deve mostrar RMT e apitar uma vez
+```
+
+- **`diag()` acha a fonte:** imprime o `config.py` a usar.
+- **Devolve bytes estranhos:** velocidade, paridade ou formato diferentes (I/O Config da fonte).
+- **Mudo em tudo + `beep()` faz a fonte reagir:** os comandos chegam, falta o caminho de
+  volta (pino 3 da fonte, GND, fio do RX do ESP).
+- **Mudo em tudo + `beep()` não faz nada:** falta o caminho de ida (cabo cruzado 2↔3, fio do TX).
+
+Obs.: o ESP32‑C3 imprime o log de boot na UART0 (GPIO21), a 115200. Apitos da fonte só
+**na hora de ligar ou resetar** o ESP vêm disso; se incomodar, mude `UART_TX`/`UART_RX`
+no `config.py` para outros GPIOs (por exemplo 4 e 3) e religue os fios.
+
 ### Roteiro de teste (nesta ordem)
 
 1. Só o módulo + ESP, **sem a fonte**: ponha um fio entre os pinos **2 e 3** do
