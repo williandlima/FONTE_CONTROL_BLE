@@ -94,8 +94,7 @@ class ProtocolTest(unittest.TestCase):
         sim = SimE3634A()
         psu = E3634A(sim, timeout_ms=200)
         psu.connect()
-        self.assertEqual(sim.log[:3], ["*CLS", "SYST:ERR?", "*IDN?"])
-        self.assertEqual(sim.log[3], "SYST:REM")
+        self.assertEqual(sim.log[:4], ["SYST:REM", "*CLS", "SYST:ERR?", "*IDN?"])
 
     def test_writes_end_with_crlf(self):
         sim = SimE3634A()

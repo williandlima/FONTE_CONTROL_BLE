@@ -106,25 +106,31 @@ A fonte salva isso em memória não volátil.
                                                           └───────────────────────────┘
 ```
 
-### Parâmetros RS-232 e controle de fluxo
+### Protocolo RS-232 da fonte (conforme o manual da família E363x)
 
-O firmware usa o mesmo método validado na bancada com esta fonte:
+Trechos do guia do usuário da E3631A (mesma interface RS-232 da E3634A):
 
-- **9600 baud, 8N1** (8 bits, sem paridade, 1 stop bit)
-- **XON/XOFF** por software, tratado pelo driver (o `machine.UART` do MicroPython
-  não tem esse recurso): bytes `0x13` (XOFF) pausam o envio e `0x11` (XON) liberam;
-  os dois são removidos das respostas
-- comandos terminados em **`\r\n`**; a leitura aceita `\n` ou `\r`
-- abertura de sessão: espera 0,3 s, `*CLS`, esvazia `SYST:ERR?` (no máximo 20
-  leituras) e só então `*IDN?`; com a fila de erros vazia a fonte não apita
-- 3 falhas seguidas de resposta antes de marcar a fonte como sem comunicação
+- a fonte é um **DTE** e faz o handshake pelas linhas **DTR (pino 4) e DSR (pino 6)**;
+- ela só transmite/recebe quando o handshake está verdadeiro; se o controlador não
+  usa handshake, o manual manda **não ligar o DTR e ligar o DSR a nível TRUE**;
+- por RS-232 é preciso mandar **`SYST:REM`** antes dos demais comandos;
+- velocidade de fábrica 9600; paridade/bits no menu I/O Config (None 8 bits, Even 7
+  bits ou Odd 7 bits).
 
-### Jumper 4 ↔ 6 (DTR → DSR): mantenha como precaução
+Consequências no projeto:
 
-Com XON/XOFF o jumper normalmente não é necessário, mas **não atrapalha**: se o
-seu exemplar da fonte também exigir o handshake por hardware (DSR ativo para
-transmitir), é ele que libera as respostas. Se a fonte aceita os comandos (display
-em `RMT`) mas nunca responde, confira primeiro o jumper e o cruzamento 2↔3.
+1. **O jumper 4↔6 é necessário.** Ele faz o DTR da própria fonte alimentar o DSR.
+   Sem ele, relatos de usuários e o manual apontam o sintoma que vimos: a fonte
+   aceita comandos mas **nunca responde** (`timeout rx=vazio`).
+2. **XON/XOFF não faz parte do protocolo da fonte.** O driver tem suporte opcional
+   (`XONXOFF` no `config.py`), desligado por padrão.
+3. O firmware abre a sessão com `SYST:REM`, `*CLS`, esvazia `SYST:ERR?` (a fila vazia
+   evita o beep) e só então `*IDN?`; comandos terminam em `\r\n`.
+4. Se o jumper está no DB9 do **módulo**, o cabo precisa levar os pinos **4 e 6**
+   (cabo reto de 9 fios ou null‑modem completo). Cabo de 3 fios (2, 3, 5) não leva
+   esses pinos: nesse caso faça o jumper no conector do lado da fonte.
+5. Para conferir: com a fonte ligada e o cabo conectado, meça no DB9 da fonte entre o
+   pino 5 e o pino 6. **+5 V a +9 V** = DSR verdadeiro; 0 V ou negativo = handshake aberto.
 
 ### Opcional: handshake completo com o 2º canal do MAX3232
 

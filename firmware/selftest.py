@@ -70,6 +70,8 @@ def probe(bauds=(9600, 19200, 4800, 2400, 1200), stops=(1, 2)):
                 u = _uart(tx, rx, baud, stop)
                 _drain(u)
                 sleep_ms(300)
+                u.write(b"SYST:REM\r\n")        # RS-232 exige modo remoto
+                sleep_ms(150)
                 u.write(b"*CLS\r\n")
                 sleep_ms(100)
                 u.write(b"*IDN?\r\n")
@@ -146,6 +148,8 @@ def diag():
         u = _uart(tx, rx, baud, stop, bits, par)
         _drain(u)
         sleep_ms(200)
+        u.write(b"SYST:REM" + eol)               # RS-232 exige modo remoto
+        sleep_ms(150)
         u.write(b"*CLS" + eol)
         sleep_ms(100)
         u.write(b"*IDN?" + eol)

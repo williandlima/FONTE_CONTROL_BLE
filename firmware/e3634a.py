@@ -2,10 +2,13 @@
 # Compativel com MicroPython (machine.UART) e CPython (pyserial via adaptador
 # ou simulador), pois so usa write()/read()/any() do objeto uart.
 #
-# Metodo de comunicacao (o mesmo validado na bancada com esta fonte):
-#   - 8N1, 9600 baud, controle de fluxo XON/XOFF por software
+# Comunicacao (conforme o manual da familia E363x):
+#   - a fonte e DTE e usa handshake DTR/DSR (hardware): ela so transmite com o
+#     DSR (pino 6) verdadeiro; para desativar, ligar o DSR a nivel TRUE (jumper
+#     4-6 no DB9). XON/XOFF nao faz parte do protocolo (suporte opcional aqui)
+#   - por RS-232 e preciso mandar SYST:REM antes dos demais comandos
 #   - escrita termina em "\r\n"; leitura aceita "\n" ou "\r"
-#   - sessao: espera 0,3 s, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
+#   - sessao: SYST:REM, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
 #     (a fila de erros vazia evita o beep da fonte)
 #   - _write NAO limpa a entrada (evita -410 Query INTERRUPTED); so a query limpa
 #   - medicao: MEAS:VOLT:DC?, 50 ms, MEAS:CURR:DC?
@@ -190,12 +193,14 @@ class E3634A:
         self._paused = False
         self._flush_input()
         sleep_ms(300)                       # porta/fonte estabilizam
+        # RS-232 so aceita comandos em modo remoto: SYST:REM sempre primeiro
+        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
+        sleep_ms(100)
         self.write("*CLS", check=False)
         self.errors(1200)                   # esvazia a fila: sem beep
         self.idn = self.query("*IDN?", 1200)
         if not self.idn:
             raise LinkError("IDN vazio")
-        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
         self._state_n = 0                   # forca releitura do estado
         return self.idn
 

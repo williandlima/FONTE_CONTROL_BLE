@@ -7,7 +7,7 @@ por **Bluetooth LE**, usando um **ESP32-C3 Super Mini** (MicroPython) como ponte
 ```
  ┌──────────────┐   BLE (NUS/JSON)   ┌──────────────────┐  UART TTL  ┌─────────┐  RS-232  ┌─────────┐
  │  App Android │ ◄────────────────► │ ESP32-C3 SuperMini│ ◄────────► │ MAX3232 │ ◄──────► │ E3634A  │
- │  (Compose)   │                    │   (MicroPython)   │  9600 8N1 + XON/XOFF  └─────────┘   SCPI   └─────────┘
+ │  (Compose)   │                    │   (MicroPython)   │  9600 8N1 + DTR/DSR  └─────────┘   SCPI   └─────────┘
  └──────────────┘                    └──────────────────┘
 ```
 
@@ -43,7 +43,7 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 - GPIO21 (TX) → MAX3232 T1IN → pino **2** da fonte
 - GPIO20 (RX) ← MAX3232 R1OUT ← pino **3** da fonte
 - GND ↔ pino **5**; MAX3232 alimentado em **3,3 V**
-- **Jumper pino 4 ↔ pino 6** no DB9 da fonte (precaução; o firmware usa XON/XOFF — ver [docs/HARDWARE.md](docs/HARDWARE.md))
+- **Jumper pino 4 ↔ pino 6** (necessário: a fonte usa handshake DTR/DSR e só responde com o DSR verdadeiro — ver [docs/HARDWARE.md](docs/HARDWARE.md))
 - Fonte em `RS-232`, `9600 BAUD`, `NONE 8 BITS` (menu I/O Config)
 
 ## 2. Firmware (ESP32-C3 Super Mini)

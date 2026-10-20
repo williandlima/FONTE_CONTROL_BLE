@@ -8,11 +8,11 @@ UART_RX = 20          # GPIO20 <- R1OUT do MAX3232 <- pino 3 (TX) da fonte
 BAUD = 9600           # padrao de fabrica da E3634A (menu I/O no painel)
 BITS = 8              # 8 bits + sem paridade (padrao "NONE 8 BITS")
 PARITY = None         # None | 0 (par) | 1 (impar) -> use 7 bits se usar paridade
-STOP = 1              # 8N1, como no metodo validado na bancada
-XONXOFF = True        # controle de fluxo por software (XON/XOFF), tratado no driver
+STOP = 1              # 1 stop bit (a fonte aceita; o diag() testa 2 tambem)
+XONXOFF = False       # o manual usa DTR/DSR (hardware, jumper 4-6); XON/XOFF so se necessario
 
-# Handshake DTR/DSR opcional (usa o 2o canal do MAX3232).
-# Se None: faca o jumper pino 4 <-> pino 6 no DB9 da fonte (ver docs/HARDWARE.md)
+# Handshake DTR/DSR: a fonte so transmite com o DSR (pino 6) verdadeiro.
+# Se estes pinos forem None: faca o jumper pino 4 <-> pino 6 no DB9 da fonte (docs/HARDWARE.md)
 DTR_IN_PIN = None     # GPIO que le o DTR da fonte (R2OUT) - fonte pronta p/ receber
 DSR_OUT_PIN = None    # GPIO que aciona o DSR da fonte (T2IN) - ESP pronto p/ receber
 
