@@ -14,8 +14,9 @@ import config as C
 TX, RX = C.UART_TX, C.UART_RX
 
 
-def _uart(tx, rx, baud=None, stop=1):
-    return UART(C.UART_ID, baudrate=baud or C.BAUD, bits=C.BITS, parity=C.PARITY,
+def _uart(tx, rx, baud=None, stop=1, bits=None, parity=-1):
+    return UART(C.UART_ID, baudrate=baud or C.BAUD, bits=bits or C.BITS,
+                parity=C.PARITY if parity == -1 else parity,
                 stop=stop, tx=tx, rx=rx, rxbuf=256, timeout=0)
 
 
@@ -135,11 +136,14 @@ def diag():
     for tx, rx in ((TX, RX), (RX, TX)):
         for stop in (1, 2):
             for eol in (b"\r\n", b"\n"):
-                combos.append((tx, rx, 9600, stop, eol))
+                combos.append((tx, rx, 9600, stop, eol, 8, None))
+    for bits, par in ((7, 0), (7, 1)):          # opcoes "Even 7 bits" e "Odd 7 bits"
+        for eol in (b"\r\n", b"\n"):
+            combos.append((TX, RX, 9600, 1, eol, bits, par))
     for baud in (19200, 4800, 2400, 1200):
-        combos.append((TX, RX, baud, 1, b"\r\n"))
-    for tx, rx, baud, stop, eol in combos:
-        u = _uart(tx, rx, baud, stop)
+        combos.append((TX, RX, baud, 1, b"\r\n", 8, None))
+    for tx, rx, baud, stop, eol, bits, par in combos:
+        u = _uart(tx, rx, baud, stop, bits, par)
         _drain(u)
         sleep_ms(200)
         u.write(b"*CLS" + eol)
@@ -149,14 +153,16 @@ def diag():
         u.deinit()
         if d:
             seen = True
-        print("   TX=%d RX=%d %d baud stop=%d eol=%r -> %r" % (tx, rx, baud, stop, eol, d))
+        print("   TX=%d RX=%d %d baud %d bits par=%s stop=%d eol=%r -> %r"
+              % (tx, rx, baud, bits, par, stop, eol, d))
         if b"HEWLETT" in d or b"AGILENT" in d.upper() or b"E36" in d:
-            best = (tx, rx, baud, stop, eol)
+            best = (tx, rx, baud, stop, bits, par, eol)
             break
 
     print("== resultado ==")
     if best:
-        print("A fonte respondeu. Use no config.py: UART_TX=%d UART_RX=%d BAUD=%d STOP=%d (terminador %r)" % best)
+        print("A fonte respondeu. Use no config.py: UART_TX=%d UART_RX=%d BAUD=%d STOP=%d "
+              "BITS=%d PARITY=%s (terminador %r)" % best)
     elif seen:
         print("A fonte devolve bytes, mas nao um *IDN? valido: velocidade, paridade ou "
               "formato diferentes. Confira I/O Config da fonte (RS-232, 9600, NONE 8 BITS).")
