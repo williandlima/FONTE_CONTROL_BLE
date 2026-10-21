@@ -96,6 +96,13 @@ class ProtocolTest(unittest.TestCase):
         psu.connect()
         self.assertEqual(sim.log[:4], ["SYST:REM", "*CLS", "SYST:ERR?", "*IDN?"])
 
+    def test_connect_sends_device_clear_first(self):
+        sim = SimE3634A()
+        sim._out = b"RESPOSTA PENDENTE\r\n"      # saida presa de sessao anterior
+        psu = E3634A(sim, timeout_ms=200)
+        self.assertIn("E3634A", psu.connect())
+        self.assertEqual(getattr(sim, "cleared", 0), 1)
+
     def test_writes_end_with_crlf(self):
         sim = SimE3634A()
         raw = []
@@ -103,7 +110,8 @@ class ProtocolTest(unittest.TestCase):
         sim.write = lambda d: (raw.append(d), orig(d))[1]
         psu = E3634A(sim, timeout_ms=200)
         psu.connect()
-        self.assertTrue(all(d.endswith(b"\r\n") for d in raw))
+        self.assertEqual(raw[0], b"\x03")            # device clear: sem terminador
+        self.assertTrue(all(d.endswith(b"\r\n") for d in raw[1:]))
 
     def test_xonxoff_stripped_from_replies(self):
         sim = SimE3634A(flow=True)

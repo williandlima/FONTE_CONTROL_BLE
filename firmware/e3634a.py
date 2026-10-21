@@ -6,6 +6,8 @@
 #   - a fonte e DTE e usa handshake DTR/DSR (hardware): ela so transmite com o
 #     DSR (pino 6) verdadeiro; para desativar, ligar o DSR a nivel TRUE (jumper
 #     4-6 no DB9). XON/XOFF nao faz parte do protocolo (suporte opcional aqui)
+#   - a fonte segura o DTR em FALSO enquanto a saida esta suspensa; o travamento
+#     (deadlock) se desfaz enviando <Ctrl-C> (0x03), que descarta a saida pendente
 #   - por RS-232 e preciso mandar SYST:REM antes dos demais comandos
 #   - escrita termina em "\r\n"; leitura aceita "\n" ou "\r"
 #   - sessao: SYST:REM, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
@@ -189,10 +191,17 @@ class E3634A:
             raise SCPIError(errs[0][0], errs[0][1])
 
     # --------------------------------------------------------------- sessao
+    def device_clear(self):
+        """<Ctrl-C>: cancela a operacao em curso e descarta a saida pendente."""
+        self.uart.write(b"\x03")
+        sleep_ms(150)
+        self._flush_input()
+
     def connect(self, lock_panel=False):
         self._paused = False
         self._flush_input()
         sleep_ms(300)                       # porta/fonte estabilizam
+        self.device_clear()                 # desfaz travamento DTR/DSR de sessoes anteriores
         # RS-232 so aceita comandos em modo remoto: SYST:REM sempre primeiro
         self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
         sleep_ms(100)
