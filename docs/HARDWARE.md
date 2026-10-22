@@ -65,6 +65,10 @@ Obs.: o ESP32‑C3 imprime o log de boot na UART0 (GPIO21), a 115200. Apitos da 
 **na hora de ligar ou resetar** o ESP vêm disso; se incomodar, mude `UART_TX`/`UART_RX`
 no `config.py` para outros GPIOs (por exemplo 4 e 3) e religue os fios.
 
+`selftest.edges()` não decodifica nada: conta transições no pino RX depois de `*IDN?`.
+Resultado maior que zero significa que a fonte transmite (então é baud/formato); zero
+significa que nada chega ao pino (DSR, fio do pino 3, módulo, fonte travada).
+
 ### Roteiro de teste (nesta ordem)
 
 1. Só o módulo + ESP, **sem a fonte**: ponha um fio entre os pinos **2 e 3** do

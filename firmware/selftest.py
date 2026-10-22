@@ -116,6 +116,49 @@ def beep():
     print("Enviado. Olhe a fonte: RMT no display? apitou uma vez?")
 
 
+def _edges(ms):
+    """Conta transicoes no pino RX durante ms (qualquer atividade, mesmo sem decodificar)."""
+    from machine import Pin
+    p = Pin(RX, Pin.IN)
+    last = p.value()
+    n = 0
+    t0 = ticks_ms()
+    while ticks_diff(ticks_ms(), t0) < ms:
+        v = p.value()
+        if v != last:
+            n += 1
+            last = v
+    return n, last
+
+
+def edges():
+    """Detector de atividade no RX, independente de baud/paridade/decodificacao.
+
+    Manda Ctrl-C, SYST:REM e *IDN? so pelo TX e conta as transicoes no RX.
+    > 0 depois do comando: a fonte transmite (se o diag nao decodifica, e baud/formato).
+    0 sempre: nada chega ao pino RX (fonte nao transmite, DSR falso, pino 3 do cabo, R1IN)."""
+    u = UART(C.UART_ID, baudrate=C.BAUD, bits=C.BITS, parity=C.PARITY,
+             stop=1, tx=TX, timeout=0)
+    sleep_ms(300)
+    idle, lvl = _edges(1000)
+    print("ocioso: %d transicoes, nivel final %d (esperado 0 e 1)" % (idle, lvl))
+    u.write(b"\x03")
+    sleep_ms(150)
+    u.write(b"SYST:REM\r\n")
+    sleep_ms(200)
+    u.write(b"*IDN?\r\n")
+    act, lvl = _edges(1500)
+    u.deinit()
+    print("apos *IDN?: %d transicoes, nivel final %d" % (act, lvl))
+    if act > 4:
+        print("HA ATIVIDADE no RX: a fonte transmite. Se diag() nao decodifica, "
+              "o problema e baud/paridade/bits ou nivel; veja a fila de erros da fonte.")
+    else:
+        print("NADA no RX: a fonte nao esta transmitindo ate o pino. Suspeitos: DSR falso, "
+              "fio do pino 3 do cabo, R1IN do modulo, fonte em HPIB ou travada (religar).")
+    return act
+
+
 def diag():
     """Diagnostico completo da serial com a fonte ligada (pare o main com Stop)."""
     print("== 1) nivel ocioso do RX (GPIO%d), esperado ALTO ==" % RX)
