@@ -12,7 +12,8 @@ STOP = 1              # 1 stop bit (a fonte aceita; o diag() testa 2 tambem)
 XONXOFF = True        # igual ao Lab Test (validado na fonte real); inofensivo se a fonte nao usa
 
 # Handshake DTR/DSR: a fonte so transmite com o DSR (pino 6) verdadeiro.
-# Se estes pinos forem None: faca o jumper pino 4 <-> pino 6 no DB9 da fonte (docs/HARDWARE.md)
+# Se estes pinos forem None: pino 6 (DSR) da fonte em +5 V por 1 kOhm e pino 4 (DTR) solto.
+# NAO use jumper 4-6: a fonte trava ao responder (docs/HARDWARE.md)
 DTR_IN_PIN = None     # GPIO que le o DTR da fonte (R2OUT) - fonte pronta p/ receber
 DSR_OUT_PIN = None    # GPIO que aciona o DSR da fonte (T2IN) - ESP pronto p/ receber
 

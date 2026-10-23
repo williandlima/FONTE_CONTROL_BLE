@@ -33,7 +33,7 @@ por **Bluetooth LE**, usando um **ESP32-C3 Super Mini** (MicroPython) como ponte
 | [`android/`](android) | App Android (Kotlin + Jetpack Compose, minSdk 26) |
 | [`tests/`](tests) | Simulador da E3634A e testes do firmware (rodam no PC) |
 | [`tools/pc_bench.py`](tools/pc_bench.py) | Terminal SCPI no PC via USB-RS232 (valida cabo/config sem ESP32) |
-| [`docs/HARDWARE.md`](docs/HARDWARE.md) | Ligações, jumper DTR/DSR, config da fonte |
+| [`docs/HARDWARE.md`](docs/HARDWARE.md) | Ligações, DSR, config da fonte |
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Protocolo JSON BLE completo |
 
 ## 1. Hardware
@@ -43,7 +43,7 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 - GPIO21 (TX) → MAX3232 T1IN → pino **2** da fonte
 - GPIO20 (RX) ← MAX3232 R1OUT ← pino **3** da fonte
 - GND ↔ pino **5**; MAX3232 alimentado em **3,3 V**
-- **Jumper pino 4 ↔ pino 6** (necessário: a fonte usa handshake DTR/DSR e só responde com o DSR verdadeiro — ver [docs/HARDWARE.md](docs/HARDWARE.md))
+- **Pino 6 (DSR) em +5 V por 1 kΩ** e **pino 4 (DTR) solto**: a fonte só responde com o DSR verdadeiro. **Não** use jumper 4↔6, ela trava ao responder (ver [docs/HARDWARE.md](docs/HARDWARE.md) e [docs/esquema_cabo_rs232.png](docs/esquema_cabo_rs232.png))
 - Fonte em `RS-232`, `9600 BAUD`, `NONE 8 BITS` (menu I/O Config)
 
 ## 2. Firmware (ESP32-C3 Super Mini)
@@ -92,7 +92,7 @@ python3 tools/pc_bench.py --port /dev/ttyUSB0  # direto na fonte via USB-RS232
 
 | Sintoma | Causa provável |
 |---|---|
-| App acha o ESP, LED pisca rápido, "fonte não responde" | Falta jumper 4–6, TX/RX invertidos, baud/paridade diferentes |
+| App acha o ESP, LED só com flashes curtos, "fonte não responde" | DSR (pino 6) não está em +5 V, jumper 4–6 presente, TX/RX invertidos, baud/paridade diferentes |
 | Display da fonte mostra `RMT` mas sem leitura | Mesmo caso acima: comandos chegam, respostas não (DSR) |
 | Erros `-222 Data out of range` | Valor acima do limite da faixa atual |
 | `resposta composta invalida` | Use `COMPOUND_QUERY = False` |

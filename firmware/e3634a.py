@@ -4,10 +4,11 @@
 #
 # Comunicacao (conforme o manual da familia E363x):
 #   - a fonte e DTE e usa handshake DTR/DSR (hardware): ela so transmite com o
-#     DSR (pino 6) verdadeiro; para desativar, ligar o DSR a nivel TRUE (jumper
-#     4-6 no DB9). XON/XOFF nao faz parte do protocolo (suporte opcional aqui)
-#   - a fonte segura o DTR em FALSO enquanto a saida esta suspensa; o travamento
-#     (deadlock) se desfaz enviando <Ctrl-C> (0x03), que descarta a saida pendente
+#     DSR (pino 6) verdadeiro. Para desativar: DTR (pino 4) desligado e DSR em
+#     nivel TRUE (+5 V por 1 kOhm). NAO usar jumper 4-6: ao ter uma resposta para
+#     mandar a fonte poe o DTR em FALSO; com o jumper o DSR cai junto e ela trava
+#   - o travamento (deadlock) se desfaz com <Ctrl-C> (0x03), que descarta a
+#     saida pendente; por isso toda sessao comeca com <Ctrl-C>
 #   - por RS-232 e preciso mandar SYST:REM antes dos demais comandos
 #   - escrita termina em "\r\n"; leitura aceita "\n" ou "\r"
 #   - sessao: SYST:REM, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
@@ -142,7 +143,10 @@ class E3634A:
                     break
             if i >= 0:
                 line, self._rx = self._rx[:i], self._rx[i + 1:]
-                s = line.decode().strip(" \x00")
+                try:
+                    s = line.decode().strip(" \x00")
+                except UnicodeError:           # lixo (baud/paridade errados)
+                    raise LinkError("rx invalido " + repr(line[:16]))
                 if not s:                      # sobra do \r\n: ignorar
                     continue
                 self._dbg("<<", s)
@@ -213,7 +217,8 @@ class E3634A:
         sleep_ms(300)                       # porta/fonte estabilizam
         if labtest:
             # sequencia do Lab Test (validada na fonte real): *CLS, esvazia SYST:ERR?,
-            # *IDN?; so depois SYST:REM. Sem <Ctrl-C> e sem SYST:REM antes do *IDN?.
+            # *IDN?; so depois SYST:REM. Antes, <Ctrl-C> descarta resposta presa.
+            self.device_clear()
             self.write("*CLS", check=False)
             self.errors(1200)
             self.idn = self.query("*IDN?", 1200)

@@ -19,8 +19,8 @@
   superior (lado oposto ao 5V); `3V3`, `G` e `5V` ficam juntos junto ao USB-C.
 - **Módulo RS-232 azul** (U1 de 16 pinos, capacitores C1–C5, LED D1, DB9 "9P"):
   header de 4 pinos **GND, TX, RX, VCC** — só o canal 1 (T1/R1). Não existe
-  DTR/DSR no módulo, então `DTR_IN_PIN`/`DSR_OUT_PIN` ficam `None` e o
-  **jumper 4↔6 vai no conector do lado da fonte**.
+  DTR/DSR no módulo, então `DTR_IN_PIN`/`DSR_OUT_PIN` ficam `None`, o
+  **pino 6 (DSR) recebe +5 V por 1 kΩ** e o **pino 4 (DTR) fica solto**.
 
 | Módulo | Super Mini |
 |---|---|
@@ -28,6 +28,7 @@
 | GND | G |
 | TX | GPIO21 |
 | RX | GPIO20 |
+| pino 6 do DB9 (DSR) | **5V por resistor de 1 kΩ** |
 
 A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
 (`selftest.loopback()`, abaixo) e ele diz se precisa inverter os dois fios.
@@ -42,8 +43,7 @@ A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
    entre as duas pontas o cabo precisa ser **null-modem (cruzado)**: 2↔3 e 5↔5.
    Um cabo reto/extensor não funciona. Se os gêneros dos conectores não
    encaixam, use um adaptador de gênero ou faça um cabo curto.
-3. **Jumper 4↔6 no conector da fonte** (ver abaixo). O módulo só leva os pinos
-   2, 3 e 5.
+3. **Pino 6 em +5 V por 1 kΩ, pino 4 solto, sem jumper 4↔6** (ver abaixo).
 
 ### Diagnóstico automático da serial
 
@@ -78,11 +78,12 @@ significa que nada chega ao pino (DSR, fio do pino 3, módulo, fonte travada).
    selftest.loopback()
    ```
    Deve imprimir `OK` para um dos sentidos e dizer se há fios invertidos.
-2. Ligue ao cabo null-modem com o jumper 4–6 na ponta da fonte, fonte em
+2. Ligue o cabo com o pino 6 em +5 V (1 kΩ) e o pino 4 solto, fonte em
    `RS-232 / 9600 / NONE 8 BITS`, e rode `selftest.probe()`. Ele varre
    baud/stop-bits/sentido até a fonte responder ao `*IDN?` e imprime os valores
    para o `config.py`.
-3. Só então rode o `main.py` e use o app.
+3. Ou rode `selftest.labtest()`, que repete a abertura do Lab Test.
+4. Só então rode o `main.py` e use o app.
 
 ## Configuração RS-232 na fonte (painel frontal)
 
@@ -104,9 +105,9 @@ A fonte salva isso em memória não volátil.
  │ GPIO21 (TX) ─┼────────────┤ T1IN   T1OUT ─┼────────────┤ 2  RXD  (entrada da fonte)│
  │ GPIO20 (RX) ─┼────────────┤ R1OUT  R1IN  ─┼────────────┤ 3  TXD  (saída da fonte)  │
  │              │            └───────────────┘            │                           │
- │ GPIO8 = LED  │                                ┌────────┤ 4  DTR  (saída)           │
- └──────────────┘                     jumper ─── │        │                           │
-                                                 └────────┤ 6  DSR  (entrada)         │
+ │ GPIO8 = LED  │                             (solto) ┤ 4  DTR  (saída)           │
+ │ 5V ──[1 kΩ]──┼─────────────────────────────────────────┤ 6  DSR  (entrada)         │
+ └──────────────┘                                         │                           │
                                                           └───────────────────────────┘
 ```
 
@@ -127,22 +128,32 @@ fabricante neste ambiente**, então confira na seção *RS-232 Interface* do gui
   Even 7 bits;
 - o cabo que acompanha a fonte é 9 pinos fêmea ↔ fêmea (cruzado, para ligar a um PC).
 
+O manual também diz quando a fonte põe o **DTR em falso**:
+
+- quando o buffer de entrada enche (≈100 caracteres);
+- **quando ela tem uma resposta para mandar** (processou uma query e recebeu o `<new line>`);
+  ela volta a pôr o DTR em verdadeiro só depois de enviar a resposta.
+
 Consequências no projeto:
 
 1. **Sem DSR verdadeiro a fonte aceita comandos (o display mostra `RMT`) mas nunca responde.**
    É o sintoma que vimos (`timeout rx=vazio`).
-2. O módulo MAX3232 de 4 pinos não tem DTR/DSR, então o DSR precisa ser ligado ao TRUE da
-   própria fonte: **jumper do pino 4 ao pino 6**, no conector do lado da fonte.
-3. Com esse jumper, se a fonte já estiver travada (DTR falso), o DSR fica falso também.
-   Por isso o firmware envia **`<Ctrl-C>` no início de cada sessão** (`device_clear()`); e,
-   depois de pôr o jumper, **desligue e ligue a fonte** uma vez.
-4. O firmware abre a sessão com `<Ctrl-C>`, `SYST:REM`, `*CLS`, esvazia `SYST:ERR?` (a fila vazia
-   evita o beep) e só então `*IDN?`; comandos terminam em `\r\n`.
-5. XON/XOFF não faz parte do protocolo da fonte (`XONXOFF = False`).
-6. O cabo precisa levar os pinos 2, 3, 5 **e 4 e 6**. Cabo de 3 fios não serve para o jumper no
-   módulo.
+2. **O jumper 4↔6 causa exatamente isso.** Com ele, o DSR copia o DTR da própria fonte. Ao ter
+   uma resposta pronta ela põe o DTR em falso, o DSR cai junto, a saída fica suspensa e o DTR
+   continua falso: travamento a cada query. Comandos sem resposta (`SYST:REM`) funcionam; queries
+   não. Os comandos seguintes ainda geram erro (`-410 Query INTERRUPTED`) e a fonte apita.
+   No PC isso não acontece porque o DSR da fonte vem do DTR do PC, que fica sempre verdadeiro.
+3. Ligação correta com o módulo de 4 pinos: **pino 4 solto** e **pino 6 em +5 V por 1 kΩ**
+   (do pad `5V` do ESP). A entrada DSR tem ~5 kΩ, então o pino 6 fica em cerca de +4 V, nível
+   verdadeiro. 3,3 V fica no limite do receptor RS-232; use os 5 V.
+4. O firmware abre a sessão com `<Ctrl-C>` (descarta uma resposta presa), `*CLS`, esvazia
+   `SYST:ERR?`, `*IDN?` e só então `SYST:REM`, como o Lab Test; comandos terminam em `\r\n`.
+5. O manual sugere baud menor (300/600/1200) com o handshake desligado, para não estourar o
+   buffer de entrada. Os comandos do firmware são curtos e cada query espera a resposta, então
+   9600 deve servir; se aparecer `-363` (overrun) na fila de erros, use 1200 na fonte e no `config.py`.
+6. Depois de mudar a ligação, **desligue e ligue a fonte** uma vez.
 7. Para conferir: com a fonte ligada e o cabo conectado, meça entre o pino 5 e o pino 6 no DB9 da
-   fonte. **+5 V a +9 V** = DSR verdadeiro.
+   fonte: **cerca de +4 V** = DSR verdadeiro.
 
 ### Opcional: handshake completo com o 2º canal do MAX3232
 
@@ -169,8 +180,8 @@ fabricante. A E3634A é **DTE**. A regra que não falha:
    negativa no mesmo pino, são duas saídas se enfrentando → inverta 2↔3.
 
 O mais seguro é ignorar o DB9 do módulo e montar um cabo curto com um
-**DB9 fêmea de solda**: pinos 2, 3, 5 até o módulo + jumper 4–6 no próprio
-conector.
+**DB9 fêmea de solda**: pinos 2, 3, 5 até o módulo, pino 6 em +5 V por 1 kΩ e
+pino 4 solto.
 
 ## Alimentação
 

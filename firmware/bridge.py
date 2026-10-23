@@ -11,7 +11,7 @@ except ImportError:
     from e3634a import ticks_ms, ticks_diff
 
 
-FW_VERSION = "1.1.4"   # sobe a cada mudanca de firmware; aparece no app
+FW_VERSION = "1.1.5"   # sobe a cada mudanca de firmware; aparece no app
 
 
 class CmdError(Exception):

@@ -118,8 +118,8 @@ def probe(bauds=(9600, 19200, 4800, 2400, 1200), stops=(1, 2)):
                     print("\nACHOU: ajuste config.py -> UART_TX=%d UART_RX=%d BAUD=%d STOP=%d"
                           % (tx, rx, baud, stop))
                     return tx, rx, baud, stop
-    print("\nSem resposta. Verifique: jumper 4-6 na fonte, cabo null-modem "
-          "(2<->3 cruzado), e se a fonte esta em RS-232 (nao HPIB).")
+    print("\nSem resposta. Verifique: pino 6 (DSR) em +5 V por 1 kOhm, pino 4 solto (sem "
+          "jumper 4-6), fonte religada e em RS-232 (nao HPIB).")
     return None
 
 

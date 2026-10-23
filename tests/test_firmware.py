@@ -96,7 +96,7 @@ class ProtocolTest(unittest.TestCase):
         psu.connect()
         self.assertEqual(sim.log[:4], ["SYST:REM", "*CLS", "SYST:ERR?", "*IDN?"])
 
-    def test_labtest_sequence_has_no_ctrl_c_and_remote_last(self):
+    def test_labtest_sequence_ctrl_c_first_and_remote_last(self):
         sim = SimE3634A()
         raw = []
         orig = sim.write
@@ -104,7 +104,7 @@ class ProtocolTest(unittest.TestCase):
         psu = E3634A(sim, timeout_ms=200)
         self.assertIn("E3634A", psu.connect(labtest=True))
         self.assertEqual(sim.log[:4], ["*CLS", "SYST:ERR?", "*IDN?", "SYST:REM"])
-        self.assertNotIn(b"\x03", b"".join(raw))
+        self.assertEqual(raw[0], b"\x03")            # descarta resposta presa
         self.assertTrue(sim.remote)
 
     def test_activity_callback_tx_and_rx(self):
