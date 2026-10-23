@@ -14,10 +14,44 @@ import config as C
 TX, RX = C.UART_TX, C.UART_RX
 
 
+class _LedUART:
+    """UART que pisca o LED azul: flash curto (40 ms) ao enviar, longo (200 ms) ao receber."""
+
+    def __init__(self, uart):
+        from machine import Pin
+        self._u = uart
+        self._led = Pin(C.LED_PIN, Pin.OUT)
+        self._flash(0)
+
+    def _flash(self, ms):
+        on = ms > 0
+        self._led.value((not on) if C.LED_ACTIVE_LOW else on)
+        if on:
+            sleep_ms(ms)
+            self._led.value(1 if C.LED_ACTIVE_LOW else 0)
+
+    def write(self, data):
+        n = self._u.write(data)
+        self._flash(40)
+        return n
+
+    def any(self):
+        return self._u.any()
+
+    def read(self, n=-1):
+        d = self._u.read(n)
+        if d:
+            self._flash(200)
+        return d
+
+    def deinit(self):
+        self._u.deinit()
+
+
 def _uart(tx, rx, baud=None, stop=1, bits=None, parity=-1):
-    return UART(C.UART_ID, baudrate=baud or C.BAUD, bits=bits or C.BITS,
-                parity=C.PARITY if parity == -1 else parity,
-                stop=stop, tx=tx, rx=rx, rxbuf=256, timeout=0)
+    return _LedUART(UART(C.UART_ID, baudrate=baud or C.BAUD, bits=bits or C.BITS,
+                         parity=C.PARITY if parity == -1 else parity,
+                         stop=stop, tx=tx, rx=rx, rxbuf=256, timeout=0))
 
 
 def _drain(u):

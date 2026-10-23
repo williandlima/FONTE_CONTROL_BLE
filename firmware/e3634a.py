@@ -64,13 +64,15 @@ def _b(s):
 
 class E3634A:
     def __init__(self, uart, timeout_ms=2500, compound=False, dtr_in=None, log=None,
-                 xonxoff=True, state_every=5):
+                 xonxoff=True, state_every=5, activity=None, idle=None):
         self.uart = uart
         self.timeout_ms = timeout_ms
         self.compound = compound
         self.dtr_in = dtr_in  # objeto Pin (entrada) ou None
         self.log = log
         self.xonxoff = xonxoff
+        self.activity = activity  # callback("tx"|"rx") p/ o LED de atividade serial
+        self.idle = idle          # chamado enquanto espera (mantem o LED atualizado)
         self.state_every = state_every
         self._rx = b""
         self._paused = False      # fonte mandou XOFF: nao transmitir
@@ -91,6 +93,8 @@ class E3634A:
         d = self.uart.read(n)
         if not d:
             return False
+        if self.activity:
+            self.activity("rx")
         if self.xonxoff:
             a, b = d.rfind(b"\x11"), d.rfind(b"\x13")
             if a >= 0 or b >= 0:
@@ -124,6 +128,8 @@ class E3634A:
                 sleep_ms(2)
         self._dbg(">>", line)
         self.uart.write(line.encode() + b"\r\n")
+        if self.activity:
+            self.activity("tx")
 
     def _readline(self, timeout_ms=None):
         timeout_ms = self.timeout_ms if timeout_ms is None else timeout_ms
@@ -150,6 +156,8 @@ class E3634A:
                 if len(self._rx) > 256:            # nao deixar crescer sem limite
                     self._rx = self._rx[-64:]
                 continue
+            if self.idle:
+                self.idle()
             sleep_ms(2)
 
     def query(self, cmd, timeout_ms=None):
@@ -194,6 +202,8 @@ class E3634A:
     def device_clear(self):
         """<Ctrl-C>: cancela a operacao em curso e descarta a saida pendente."""
         self.uart.write(b"\x03")
+        if self.activity:
+            self.activity("tx")
         sleep_ms(150)
         self._flush_input()
 

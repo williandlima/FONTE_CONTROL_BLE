@@ -107,6 +107,14 @@ class ProtocolTest(unittest.TestCase):
         self.assertNotIn(b"\x03", b"".join(raw))
         self.assertTrue(sim.remote)
 
+    def test_activity_callback_tx_and_rx(self):
+        sim = SimE3634A()
+        ev = []
+        psu = E3634A(sim, timeout_ms=200, activity=ev.append)
+        psu.query("*IDN?")
+        self.assertEqual(ev[0], "tx")
+        self.assertIn("rx", ev)
+
     def test_connect_sends_device_clear_first(self):
         sim = SimE3634A()
         sim._out = b"RESPOSTA PENDENTE\r\n"      # saida presa de sessao anterior

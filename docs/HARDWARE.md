@@ -180,10 +180,17 @@ conector.
 - O GND do RS-232 da E3634A é o terra do chassi/interface — o terminal de
   saída da fonte é flutuante, então não há laço de terra com a carga.
 
-## LED de status (GPIO8)
+## LED azul = atividade da serial (GPIO8)
+
+O LED pisca a cada byte trocado com a fonte, para validar a comunicação sem console:
 
 | LED | Significado |
 |---|---|
-| Pisca lento (1 s) | Aguardando o app conectar via BLE |
-| Pisca rápido | App conectado, mas a fonte **não responde** (cabo/baud/jumper) |
-| Aceso fixo | App conectado e fonte em comunicação |
+| Flash **curto** (40 ms) | O ESP enviou um comando à fonte (TX) |
+| Flash **longo** (200 ms) | A fonte **respondeu** (RX chegou) |
+| Só flashes curtos, nunca longos | A fonte recebe os comandos mas não responde (o caso a depurar) |
+| Apagado em repouso | App conectado e nada trafegando |
+| Piscada de 50 ms a cada 2 s | Nenhum app conectado (BLE anunciando) |
+
+Os testes do `selftest.py` que usam a UART (`loopback()`, `diag()`, `probe()`, `beep()`, `labtest()`)
+usam o mesmo padrão. Em um loopback correto você vê um flash curto seguido de um longo.
