@@ -43,7 +43,8 @@ psu = E3634A(uart, timeout_ms=C.TIMEOUT_MS, compound=C.COMPOUND_QUERY,
              dtr_in=dtr_in, log=log if C.DEBUG else None, xonxoff=C.XONXOFF)
 ble = BLEUART(C.BLE_NAME)
 bridge = Bridge(psu, ble.send_line, poll_ms=C.POLL_MS, poll_min_ms=C.POLL_MIN_MS,
-                reconnect_ms=C.RECONNECT_MS, lock_panel=C.LOCK_FRONT_PANEL)
+                reconnect_ms=C.RECONNECT_MS, lock_panel=C.LOCK_FRONT_PANEL,
+                labtest=C.LABTEST_SEQUENCE)
 
 print("E3634A-BLE pronto. BLE:", C.BLE_NAME)
 

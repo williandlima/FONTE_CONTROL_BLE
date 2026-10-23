@@ -9,7 +9,7 @@ BAUD = 9600           # padrao de fabrica da E3634A (menu I/O no painel)
 BITS = 8              # 8 bits + sem paridade (padrao "NONE 8 BITS")
 PARITY = None         # None | 0 (par) | 1 (impar) -> use 7 bits se usar paridade
 STOP = 1              # 1 stop bit (a fonte aceita; o diag() testa 2 tambem)
-XONXOFF = False       # o manual usa DTR/DSR (hardware, jumper 4-6); XON/XOFF so se necessario
+XONXOFF = True        # igual ao Lab Test (validado na fonte real); inofensivo se a fonte nao usa
 
 # Handshake DTR/DSR: a fonte so transmite com o DSR (pino 6) verdadeiro.
 # Se estes pinos forem None: faca o jumper pino 4 <-> pino 6 no DB9 da fonte (docs/HARDWARE.md)
@@ -18,6 +18,7 @@ DSR_OUT_PIN = None    # GPIO que aciona o DSR da fonte (T2IN) - ESP pronto p/ re
 
 TIMEOUT_MS = 2500     # timeout de resposta a uma query (MEAS? e lento)
 COMPOUND_QUERY = False  # False: MEAS:VOLT:DC? / 50 ms / MEAS:CURR:DC? (metodo validado)
+LABTEST_SEQUENCE = True  # abre a sessao como o Lab Test: *CLS, SYST:ERR?, *IDN?, depois SYST:REM
 LOCK_FRONT_PANEL = False  # True -> SYST:RWL (trava o painel em modo remoto)
 
 # ---------------- BLE ----------------

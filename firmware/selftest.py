@@ -116,6 +116,43 @@ def beep():
     print("Enviado. Olhe a fonte: RMT no display? apitou uma vez?")
 
 
+def labtest():
+    """Reproduz a abertura do Lab Test, byte a byte: 9600 8N1, espera 0,3 s, *CLS,
+    esvazia SYST:ERR?, *IDN?. Sem Ctrl-C e sem SYST:REM. Imprime o que a fonte devolve."""
+    u = _uart(TX, RX, 9600, 1, 8, None)
+    _drain(u)
+    sleep_ms(300)
+
+    def ask(cmd, ms=2000):
+        u.write(cmd + b"\r\n")
+        buf = b""
+        t0 = ticks_ms()
+        while ticks_diff(ticks_ms(), t0) < ms:
+            if u.any():
+                buf += u.read(u.any())
+                if b"\n" in buf:
+                    break
+            else:
+                sleep_ms(5)
+        print("%-12r -> %r" % (cmd, buf))
+        return buf
+
+    u.write(b"*CLS\r\n")
+    sleep_ms(100)
+    for _ in range(5):
+        r = ask(b"SYST:ERR?")
+        if not r or b"+0" in r:
+            break
+    r = ask(b"*IDN?", 3000)
+    u.deinit()
+    if b"E36" in r or b"HEWLETT" in r.upper() or b"AGILENT" in r.upper():
+        print("OK: a fonte respondeu com a sequencia do Lab Test.")
+    else:
+        print("Sem resposta com a sequencia exata do Lab Test: o metodo nao e a causa; "
+              "a diferenca esta na camada eletrica (DSR/DTR, pino 3, nivel).")
+    return r
+
+
 def _edges(ms):
     """Conta transicoes no pino RX durante ms (qualquer atividade, mesmo sem decodificar)."""
     from machine import Pin

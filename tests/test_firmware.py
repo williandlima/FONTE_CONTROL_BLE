@@ -96,6 +96,17 @@ class ProtocolTest(unittest.TestCase):
         psu.connect()
         self.assertEqual(sim.log[:4], ["SYST:REM", "*CLS", "SYST:ERR?", "*IDN?"])
 
+    def test_labtest_sequence_has_no_ctrl_c_and_remote_last(self):
+        sim = SimE3634A()
+        raw = []
+        orig = sim.write
+        sim.write = lambda d: (raw.append(bytes(d)), orig(d))[1]
+        psu = E3634A(sim, timeout_ms=200)
+        self.assertIn("E3634A", psu.connect(labtest=True))
+        self.assertEqual(sim.log[:4], ["*CLS", "SYST:ERR?", "*IDN?", "SYST:REM"])
+        self.assertNotIn(b"\x03", b"".join(raw))
+        self.assertTrue(sim.remote)
+
     def test_connect_sends_device_clear_first(self):
         sim = SimE3634A()
         sim._out = b"RESPOSTA PENDENTE\r\n"      # saida presa de sessao anterior

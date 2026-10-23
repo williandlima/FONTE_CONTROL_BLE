@@ -197,10 +197,22 @@ class E3634A:
         sleep_ms(150)
         self._flush_input()
 
-    def connect(self, lock_panel=False):
+    def connect(self, lock_panel=False, labtest=False):
         self._paused = False
         self._flush_input()
         sleep_ms(300)                       # porta/fonte estabilizam
+        if labtest:
+            # sequencia do Lab Test (validada na fonte real): *CLS, esvazia SYST:ERR?,
+            # *IDN?; so depois SYST:REM. Sem <Ctrl-C> e sem SYST:REM antes do *IDN?.
+            self.write("*CLS", check=False)
+            self.errors(1200)
+            self.idn = self.query("*IDN?", 1200)
+            if not self.idn:
+                raise LinkError("IDN vazio")
+            self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
+            sleep_ms(100)
+            self._state_n = 0
+            return self.idn
         self.device_clear()                 # desfaz travamento DTR/DSR de sessoes anteriores
         # RS-232 so aceita comandos em modo remoto: SYST:REM sempre primeiro
         self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
