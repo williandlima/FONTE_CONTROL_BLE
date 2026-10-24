@@ -2,3 +2,16 @@ __pycache__/
 *.pyc
 *.mpy
 .venv/
+# firmware C / ferramentas de PC
+firmware/.pio/
+firmware/build/
+firmware/sdkconfig
+firmware/sdkconfig.*
+!firmware/sdkconfig.defaults
+firmware/.vscode/*
+!firmware/.vscode/extensions.json
+firmware/dependencies.lock
+tests/test_core
+tests/e2e_*.log
+host/pc_bridge
+host/sim_serial

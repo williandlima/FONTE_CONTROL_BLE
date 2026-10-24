@@ -1,13 +1,13 @@
 # FONTE_CONTROL_BLE
 
 Controle total e leitura de tensão/corrente da fonte **Agilent/Keysight E3634A**
-por **Bluetooth LE**, usando um **ESP32-C3 Super Mini** (MicroPython) como ponte
-**BLE ↔ RS-232 (SCPI)** e um **app Android**.
+por **Bluetooth LE**, usando um **ESP32-C3 Super Mini** (firmware em **C / ESP-IDF**) como
+ponte **BLE ↔ RS-232 (SCPI)** e um **app Android**.
 
 ```
  ┌──────────────┐   BLE (NUS/JSON)   ┌──────────────────┐  UART TTL  ┌─────────┐  RS-232  ┌─────────┐
  │  App Android │ ◄────────────────► │ ESP32-C3 SuperMini│ ◄────────► │ MAX3232 │ ◄──────► │ E3634A  │
- │  (Compose)   │                    │   (MicroPython)   │  9600 8N1 + DTR/DSR  └─────────┘   SCPI   └─────────┘
+ │  (Compose)   │                    │  (C / ESP-IDF)    │  9600 8N2            └─────────┘   SCPI   └─────────┘
  └──────────────┘                    └──────────────────┘
 ```
 
@@ -29,12 +29,15 @@ por **Bluetooth LE**, usando um **ESP32-C3 Super Mini** (MicroPython) como ponte
 
 | Pasta | Conteúdo |
 |---|---|
-| [`firmware/`](firmware) | MicroPython para o ESP32-C3 (`main.py`, `config.py`, driver `e3634a.py`, protocolo `bridge.py`, BLE `ble_uart.py`) |
+| [`firmware/`](firmware) | Firmware em C (ESP-IDF + PlatformIO): `core/` portátil (driver SCPI, protocolo, JSON) e `main/` (BLE, UART, LED, console) |
+| [`tests/`](tests) | Simulador da E3634A em C (com o handshake DTR/DSR), testes do núcleo e teste de ponta a ponta |
+| [`host/`](host) | `pc_bridge`: o mesmo núcleo C rodando no PC por uma COM (teste com a fonte real sem ESP) |
 | [`android/`](android) | App Android (Kotlin + Jetpack Compose, minSdk 26) |
-| [`tests/`](tests) | Simulador da E3634A e testes do firmware (rodam no PC) |
-| [`tools/pc_bench.py`](tools/pc_bench.py) | Terminal SCPI no PC via USB-RS232 (valida cabo/config sem ESP32) |
-| [`docs/HARDWARE.md`](docs/HARDWARE.md) | Ligações, DSR, config da fonte |
+| [`docs/FIRMWARE_C.md`](docs/FIRMWARE_C.md) | Compilar e gravar com o VS Code |
+| [`docs/SCPI_E3634A.md`](docs/SCPI_E3634A.md) | RS-232 e SCPI da E3634A, com as fontes do manual |
+| [`docs/HARDWARE.md`](docs/HARDWARE.md) | Ligações, DSR, diagnóstico |
 | [`docs/PROTOCOLO.md`](docs/PROTOCOLO.md) | Protocolo JSON BLE completo |
+| [`legacy/micropython/`](legacy/micropython) | Firmware MicroPython anterior (1.1.5), só para referência |
 
 ## 1. Hardware
 
@@ -48,21 +51,16 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 
 ## 2. Firmware (ESP32-C3 Super Mini)
 
-1. Grave o MicroPython para **ESP32-C3** (https://micropython.org/download/ESP32_GENERIC_C3/):
-   ```bash
-   pip install esptool mpremote
-   python -m esptool --chip esp32c3 --port /dev/ttyACM0 erase_flash
-   python -m esptool --chip esp32c3 --port /dev/ttyACM0 write_flash -z 0x0 ESP32_GENERIC_C3-*.bin
-   ```
-   (Se não entrar em modo boot: segure **BOOT**, aperte **RESET**, solte BOOT.)
-2. Copie os arquivos:
-   ```bash
-   cd firmware
-   python -m mpremote connect /dev/ttyACM0 cp config.py e3634a.py bridge.py ble_uart.py selftest.py boot.py main.py : + reset
-   ```
-3. Teste a fiação antes (loopback e sondagem da fonte): `import selftest` no REPL,
-   ver [docs/HARDWARE.md](docs/HARDWARE.md#roteiro-de-teste-nesta-ordem).
-4. Para ver o log: `DEBUG = True` no `config.py` e `mpremote connect /dev/ttyACM0 repl`.
+Passo a passo completo em **[docs/FIRMWARE_C.md](docs/FIRMWARE_C.md)**. Resumo:
+
+1. VS Code + extensão **PlatformIO IDE**.
+2. **Abrir Pasta** → `firmware/`.
+3. Barra azul de baixo: **✓ Build**, **→ Upload** (se não conectar: BOOT + RST), **🔌 Monitor**.
+4. No Monitor aparecem as linhas SCPI (`>` enviada, `<` recebida) e dá para digitar `help`,
+   `diag`, `loop`, `*IDN?` ou um comando do app como `{"cmd":"meas"}`.
+
+Sem instalar nada: baixe o artefato **firmware-esp32c3-supermini** da aba *Actions* do GitHub e
+grave `e3634a-ble-completo.bin` em **0x0** pelo https://espressif.github.io/esptool-js/.
 
 O dispositivo anuncia como **`E3634A-BLE`**.
 
@@ -83,17 +81,20 @@ trigger, sistema) e **SCPI** (console).
 ## 4. Testes sem hardware
 
 ```bash
-python3 -m unittest discover -s tests -v       # driver + protocolo contra o simulador
-python3 tools/pc_bench.py --sim                # terminal SCPI no simulador
-python3 tools/pc_bench.py --port /dev/ttyUSB0  # direto na fonte via USB-RS232
+make -C tests          # núcleo C: app -> bridge -> driver -> E3634A simulada (relógio virtual)
+make -C tests e2e      # ponta a ponta: processos + porta serial virtual (Linux)
+host/bin/pc_bridge.exe COM5   # Windows: mesmo núcleo C direto na fonte via USB-RS232
 ```
+
+O simulador reproduz o handshake real: com **jumper 4↔6** ou **pino 6 solto** a fonte aceita
+comandos e nunca responde, exatamente o sintoma da bancada.
 
 ## Diagnóstico rápido
 
 | Sintoma | Causa provável |
 |---|---|
-| App acha o ESP, LED só com flashes curtos, "fonte não responde" | DSR (pino 6) não está em +5 V, jumper 4–6 presente, TX/RX invertidos, baud/paridade diferentes |
+| App acha o ESP, LED só com flashes curtos, "fonte não responde" | DSR (pino 6) não está em +5 V, jumper 4–6 presente, TX/RX invertidos, baud/paridade diferentes. Rode `diag` no Monitor |
 | Display da fonte mostra `RMT` mas sem leitura | Mesmo caso acima: comandos chegam, respostas não (DSR) |
 | Erros `-222 Data out of range` | Valor acima do limite da faixa atual |
-| `resposta composta invalida` | Use `COMPOUND_QUERY = False` |
+| `resposta composta invalida` | Use `PSU_COMPOUND_QUERY 0` (padrão) |
 | Painel da fonte travado | Modo RWL: use **Modo LOCAL** no app ou desligue "Travar painel" |

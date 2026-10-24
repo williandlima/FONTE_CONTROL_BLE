@@ -77,11 +77,12 @@ P50V: 51,5 V/4,12 A) **e** novamente pela fonte (`SYST:ERR?` após cada escrita)
 
 ## Leitura de medição
 
-Por padrão o firmware usa uma **query composta** (uma única transação RS-232):
+Opcionalmente o firmware usa uma **query composta** (uma única transação RS-232):
 
 ```
-MEAS:VOLT?;:MEAS:CURR?;:OUTP?;:VOLT:PROT:TRIP?;:CURR:PROT:TRIP?
+MEAS:VOLT:DC?;:MEAS:CURR:DC?;:OUTP?;:VOLT:PROT:TRIP?;:CURR:PROT:TRIP?
 ```
 
-Se o seu firmware de fonte não aceitar, use `COMPOUND_QUERY = False` em
-`config.py` (5 queries separadas, mais lento).
+Padrão: `PSU_COMPOUND_QUERY 0` em `firmware/core/config.h` (`MEAS:VOLT:DC?`, 50 ms,
+`MEAS:CURR:DC?`; `OUTP?` e os `TRIP?` a cada 5 leituras), o método validado no Lab Test.
+Com `1` usa a query composta acima (uma transação, mais rápida).

@@ -10,8 +10,8 @@
 | Fonte 5 V USB-C (carregador de celular) | Alimenta o ESP32 e o MAX3232 |
 
 > Modelo assumido: **Agilent/Keysight E3634A** (25 V/7 A e 50 V/4 A, RS-232 + GPIB).
-> As irmãs E3632A/E3633A usam o mesmo conjunto SCPI (mudam só os limites em
-> `firmware/e3634a.py` → `RANGES`).
+> As irmãs E3632A/E3633A usam o mesmo conjunto SCPI (mudam só os limites
+> `PSU_P25V_*`/`PSU_P50V_*` em `firmware/core/psu.h`).
 
 ## Seu hardware (conferido pela foto)
 
@@ -19,7 +19,8 @@
   superior (lado oposto ao 5V); `3V3`, `G` e `5V` ficam juntos junto ao USB-C.
 - **Módulo RS-232 azul** (U1 de 16 pinos, capacitores C1–C5, LED D1, DB9 "9P"):
   header de 4 pinos **GND, TX, RX, VCC** — só o canal 1 (T1/R1). Não existe
-  DTR/DSR no módulo, então `DTR_IN_PIN`/`DSR_OUT_PIN` ficam `None`, o
+  DTR/DSR no módulo, então `PSU_DTR_IN_GPIO`/`PSU_DSR_OUT_GPIO` ficam `-1`
+  (`firmware/main/board.h`), o
   **pino 6 (DSR) recebe +5 V por 1 kΩ** e o **pino 4 (DTR) fica solto**.
 
 | Módulo | Super Mini |
@@ -31,7 +32,7 @@
 | pino 6 do DB9 (DSR) | **5V por resistor de 1 kΩ** |
 
 A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
-(`selftest.loopback()`, abaixo) e ele diz se precisa inverter os dois fios.
+`loop` no console (abaixo) e ele diz se a ida e a volta funcionam.
 
 ### Três coisas a conferir antes de ligar na fonte
 
@@ -45,52 +46,51 @@ A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
    encaixam, use um adaptador de gênero ou faça um cabo curto.
 3. **Pino 6 em +5 V por 1 kΩ, pino 4 solto, sem jumper 4↔6** (ver abaixo).
 
-### Diagnóstico automático da serial
+### Diagnóstico pelo console USB
 
-Com a fonte ligada e o `main.py` parado (**Stop** no Thonny), no Shell:
+O firmware em C mostra no console USB (VS Code → PlatformIO → **Monitor**, 115200) cada linha
+SCPI enviada (`>`) e recebida (`<`), e aceita comandos (digite `help`):
 
-```python
-import selftest
-selftest.diag()     # nível do RX, escuta passiva e *IDN? em várias configurações
-selftest.beep()     # só o caminho ESP -> fonte: a fonte deve mostrar RMT e apitar uma vez
-```
+| Comando | O que faz |
+|---|---|
+| `loop` | Loopback: com um fio entre os pinos **2 e 3** do DB9 do módulo (sem a fonte), o que sai tem que voltar |
+| `diag` | Manda `<Ctrl-C>` + `*IDN?` e mostra **todos os bytes crus** que voltarem em 1,5 s |
+| `*IDN?`, `MEAS:VOLT?`... | Qualquer SCPI: com `?` mostra a resposta; sem `?` confere `SYST:ERR?` |
+| `link` | Nova tentativa de abrir a sessão com a fonte |
+| `baud 1200` | Muda a velocidade (tem que ser igual à da fonte) |
+| `{"cmd":"meas"}` | Qualquer comando do app, sem precisar do celular |
+| `trace` | Liga/desliga o log das linhas SCPI |
 
-- **`diag()` acha a fonte:** imprime o `config.py` a usar.
-- **Devolve bytes estranhos:** velocidade, paridade ou formato diferentes (I/O Config da fonte).
-- **Mudo em tudo + `beep()` faz a fonte reagir:** os comandos chegam, falta o caminho de
-  volta (pino 3 da fonte, GND, fio do RX do ESP).
-- **Mudo em tudo + `beep()` não faz nada:** falta o caminho de ida (cabo cruzado 2↔3, fio do TX).
+Como ler o `diag`:
 
-Obs.: o ESP32‑C3 imprime o log de boot na UART0 (GPIO21), a 115200. Apitos da fonte só
-**na hora de ligar ou resetar** o ESP vêm disso; se incomodar, mude `UART_TX`/`UART_RX`
-no `config.py` para outros GPIOs (por exemplo 4 e 3) e religue os fios.
+- **0 bytes recebidos:** a fonte não transmite: DSR (pino 6) sem +5 V, jumper 4↔6, fio do pino 3,
+  ou fonte em HPIB. Se o display mostra `RMT` depois de `link`, a ida funciona e falta a volta.
+- **Bytes sem texto legível:** baud/paridade diferentes da fonte (menu I/O Config).
+- **`HEWLETT-PACKARD,E3634A,...`:** a serial está perfeita.
 
-`selftest.edges()` não decodifica nada: conta transições no pino RX depois de `*IDN?`.
-Resultado maior que zero significa que a fonte transmite (então é baud/formato); zero
-significa que nada chega ao pino (DSR, fio do pino 3, módulo, fonte travada).
+Obs.: no boot, a ROM do ESP32‑C3 imprime algumas linhas em 115200 no GPIO21 (antes do firmware
+assumir o pino). A fonte pode apitar **uma vez ao ligar/resetar o ESP**; a sessão seguinte limpa a
+fila de erros. O console do firmware fica no USB, não no GPIO20/21.
+
+### Teste sem o ESP (PC + adaptador USB-RS232, como o Lab Test)
+
+`host/bin/pc_bridge.exe COM5` roda **o mesmo código C do firmware** no PC. Se lá a fonte
+responde e no ESP não, o firmware está certo e a diferença é elétrica (pino 6, jumper, módulo).
 
 ### Roteiro de teste (nesta ordem)
 
-1. Só o módulo + ESP, **sem a fonte**: ponha um fio entre os pinos **2 e 3** do
-   DB9 do módulo e, no REPL (`mpremote connect /dev/ttyACM0 repl`):
-   ```python
-   import selftest
-   selftest.loopback()
-   ```
-   Deve imprimir `OK` para um dos sentidos e dizer se há fios invertidos.
+1. Só o módulo + ESP, **sem a fonte**: fio entre os pinos **2 e 3** do DB9 do módulo e, no
+   console, `loop` → deve dar `OK`.
 2. Ligue o cabo com o pino 6 em +5 V (1 kΩ) e o pino 4 solto, fonte em
-   `RS-232 / 9600 / NONE 8 BITS`, e rode `selftest.probe()`. Ele varre
-   baud/stop-bits/sentido até a fonte responder ao `*IDN?` e imprime os valores
-   para o `config.py`.
-3. Ou rode `selftest.labtest()`, que repete a abertura do Lab Test.
-4. Só então rode o `main.py` e use o app.
+   `RS-232 / 9600 / NONE 8 BITS`, **desligue e ligue a fonte**, e rode `diag`.
+3. Com o `diag` mostrando o `*IDN?`, use `link` (ou espere a reconexão automática) e o app.
 
 ## Configuração RS-232 na fonte (painel frontal)
 
 No menu **I/O Config** da fonte selecione:
 
 1. `RS-232` (em vez de HPIB/488)
-2. `9600 BAUD` (padrão; se mudar, ajuste `BAUD` em `firmware/config.py`)
+2. `9600 BAUD` (padrão; se mudar, ajuste `PSU_BAUD` em `firmware/core/config.h` ou use `baud N` no console)
 3. `NONE 8 BITS` (paridade nenhuma, 8 bits)
 
 A fonte salva isso em memória não volátil.
@@ -112,6 +112,8 @@ A fonte salva isso em memória não volátil.
 ```
 
 ### Protocolo RS-232 da fonte (manual da família E363x)
+
+Resumo completo, com os comandos usados e as fontes, em [SCPI_E3634A.md](SCPI_E3634A.md).
 
 O que o manual diz (trechos do guia da E3631A/E3633A/E3634A; **não consegui abrir os PDFs do
 fabricante neste ambiente**, então confira na seção *RS-232 Interface* do guia
@@ -150,7 +152,7 @@ Consequências no projeto:
    `SYST:ERR?`, `*IDN?` e só então `SYST:REM`, como o Lab Test; comandos terminam em `\r\n`.
 5. O manual sugere baud menor (300/600/1200) com o handshake desligado, para não estourar o
    buffer de entrada. Os comandos do firmware são curtos e cada query espera a resposta, então
-   9600 deve servir; se aparecer `-363` (overrun) na fila de erros, use 1200 na fonte e no `config.py`.
+   9600 deve servir; se aparecer `-363` (overrun) na fila de erros, use 1200 na fonte e em `PSU_BAUD`.
 6. Depois de mudar a ligação, **desligue e ligue a fonte** uma vez.
 7. Para conferir: com a fonte ligada e o cabo conectado, meça entre o pino 5 e o pino 6 no DB9 da
    fonte: **cerca de +4 V** = DSR verdadeiro.
@@ -164,8 +166,9 @@ Se o seu módulo expõe T2/R2:
 | GPIO (ex. 3) ← | R2OUT ← R2IN | ← pino 4 (DTR) |
 | GPIO (ex. 4) → | T2IN → T2OUT | → pino 6 (DSR) |
 
-e em `config.py`: `DTR_IN_PIN = 3`, `DSR_OUT_PIN = 4`. O firmware espera o
-DTR da fonte antes de cada envio (evita estourar o buffer dela).
+e em `firmware/main/board.h`: `PSU_DTR_IN_GPIO 3`, `PSU_DSR_OUT_GPIO 4`. O firmware espera o
+DTR da fonte antes de cada envio (evita estourar o buffer dela) e mantém o DSR verdadeiro
+(o MAX3232 inverte: nível TTL baixo = linha RS-232 verdadeira).
 
 ## Atenção ao "cruzamento" TX/RX do módulo
 
@@ -203,5 +206,5 @@ O LED pisca a cada byte trocado com a fonte, para validar a comunicação sem co
 | Apagado em repouso | App conectado e nada trafegando |
 | Piscada de 50 ms a cada 2 s | Nenhum app conectado (BLE anunciando) |
 
-Os testes do `selftest.py` que usam a UART (`loopback()`, `diag()`, `probe()`, `beep()`, `labtest()`)
-usam o mesmo padrão. Em um loopback correto você vê um flash curto seguido de um longo.
+Os comandos de console `link`, `*IDN?` etc. usam o mesmo padrão: um flash curto seguido de um
+longo quer dizer comando enviado e resposta recebida.
