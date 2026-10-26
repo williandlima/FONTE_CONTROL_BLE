@@ -12,6 +12,8 @@ Fontes consultadas:
 - [Keysight E3633A/E3634A User Manual (ManualsLib)](https://www.manualslib.com/manual/1210452/Keysight-E3633a.html)
 - [Agilent 34401A: DTR/DSR handshake protocol](https://www.manualsdir.com/manuals/41045/agilent-technologies-34401a.html?page=157) (mesmo texto da família)
 - [Agilent AN 5989-6580EN: RS-232 Troubleshooting](https://xdevs.com/doc/HP_Agilent_Keysight/5989-6580EN%20RS-232%20Troubleshooting%20-%20Application%20Note%20c20140910%20%5B8%5D.pdf)
+- [Keysight/Agilent E3633A/E3634A User's Guide (cópia widespan.co.kr)](http://www.widespan.co.kr/files/widespan/pdf/E3633A_E3634A_manual.pdf) — confirma 2 stop bits com paridade None
+- [Nota sobre RS-232 em instrumentos Agilent em geral (industrialmonitordirect.com, via 34401A)](https://industrialmonitordirect.com/blogs/knowledgebase/agilent-34401a-rs-232-remote-interface-setup-and-scpi-programming) — "most Agilent instruments must have CTS high (positive) in order to communicate"
 
 > Os PDFs não abriram neste ambiente (o proxy bloqueia os sites). Os itens marcados **✔** foram
 > confirmados nos trechos dos próprios manuais devolvidos pela busca. Os demais vêm do
@@ -26,9 +28,15 @@ Fontes consultadas:
 | Velocidade | 300, 600, 1200, 2400, 4800, **9600** (fábrica) | `PSU_BAUD 9600` |
 | Paridade/bits | **None 8 bits** (fábrica), Even 7 bits, Odd 7 bits | 8N |
 | Start/stop | 1 start bit; **2 stop bits** (padrão dos instrumentos Agilent ✔) | `PSU_STOP_BITS 2` (TX com 2 serve para quem espera 1 ou 2) |
-| Conector | DB9 macho, a fonte é **DTE** ✔: 2 = RXD (entra), 3 = TXD (sai), 4 = DTR (sai), 5 = GND, **6 = DSR (entra)** | cabo cruzado 2↔3 |
+| Conector | DB9 macho, a fonte é **DTE** ✔: 2 = RXD (entra), 3 = TXD (sai), 4 = DTR (sai), 5 = GND, **6 = DSR (entra)**, 7 = RTS (sai), **8 = CTS (entra)** | cabo cruzado 2↔3, 4↔6, 7↔8 |
 
-## 2. Handshake DTR/DSR (a causa do `timeout rx=vazio`)
+## 2. Handshake DTR/DSR **e** RTS/CTS (a causa do `timeout rx=vazio`)
+
+Um cabo null-modem de fábrica cruza **as duas** linhas de controle (4↔6 e 7↔8), e tanto o DTR
+quanto o RTS de um PC ficam em nível alto por padrão quando a porta abre — por isso um PC com
+cabo de fábrica (como o Lab Test) nunca precisa se preocupar com isso. Um módulo MAX3232 de 4
+pinos não tem nenhuma das duas linhas, então **as duas precisam ser forçadas por resistor** —
+só o DSR não é o bastante se a fonte também checar o CTS (ver item "RTS/CTS" abaixo).
 
 - A fonte é DTE e usa **DTR (pino 4)** e **DSR (pino 6)** para o handshake ✔.
 - **O DTR precisa estar TRUE para a fonte aceitar dados** ✔; ela usa o DTR como sinal de
@@ -41,14 +49,21 @@ Fontes consultadas:
 - O travamento se desfaz com **`<Ctrl-C>`**, que descarta a saída pendente.
 - Sem handshake: **DTR desligado e DSR em nível TRUE**.
 
+**RTS/CTS:** segundo uma nota de aplicação da Agilent sobre RS-232 (não específica da E3634A,
+tratar como reforço, não confirmação direta do manual desta fonte), a maioria dos instrumentos
+Agilent **também** exige o **CTS (pino 8) em nível TRUE** para se comunicar — independente do
+DTR/DSR. Sem handshake: **RTS desligado e CTS em nível TRUE** (mesma lógica do DSR, pino 7↔8 em
+vez de 4↔6).
+
 Por isso:
 
 | Ligação | Resultado | Simulado em |
 |---|---|---|
-| Pino 6 em +5 V por 1 kΩ, pino 4 solto | Funciona | `tests/test_core.c` `t_app_session`, `tests/e2e_serial.py` |
+| Pinos 6 e 8 em +5 V por 1 kΩ cada, pinos 4 e 7 soltos | Funciona | `tests/test_core.c` `t_app_session`, `tests/e2e_serial.py` |
+| Só o pino 6 em +5 V, pino 8 (CTS) solto | Pode continuar mudo, se a fonte também checar o CTS | — (hipótese do AN da Agilent, não simulada) |
 | Jumper 4↔6 | Aceita comandos (`RMT` acende), **trava na 1ª query**; comandos seguintes dão `-410` e beep | `t_jumper_4_6_deadlock` |
 | Pino 6 solto | Aceita comandos, **nunca responde** | `t_dsr_open` |
-| PC com adaptador USB (Lab Test) | Funciona: o DTR do PC deixa o DSR da fonte TRUE | `host/pc_bridge` |
+| PC com adaptador USB + cabo null-modem de fábrica (Lab Test) | Funciona: o DTR e o RTS do PC deixam o DSR e o CTS da fonte TRUE | `host/pc_bridge` |
 
 ## 3. Comandos exclusivos da RS-232
 

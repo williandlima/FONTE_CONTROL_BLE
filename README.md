@@ -46,7 +46,7 @@ Veja **[docs/HARDWARE.md](docs/HARDWARE.md)**. Resumo:
 - GPIO21 (TX) → MAX3232 T1IN → pino **2** da fonte
 - GPIO20 (RX) ← MAX3232 R1OUT ← pino **3** da fonte
 - GND ↔ pino **5**; MAX3232 alimentado em **3,3 V**
-- **Pino 6 (DSR) em +5 V por 1 kΩ** e **pino 4 (DTR) solto**: a fonte só responde com o DSR verdadeiro. **Não** use jumper 4↔6, ela trava ao responder (ver [docs/HARDWARE.md](docs/HARDWARE.md) e [docs/esquema_cabo_rs232.png](docs/esquema_cabo_rs232.png))
+- **Pino 6 (DSR) e pino 8 (CTS) em +5 V por 1 kΩ cada**, **pinos 4 (DTR) e 7 (RTS) soltos**: a fonte só responde com DSR e CTS verdadeiros. **Não** use jumper 4↔6, ela trava ao responder (ver [docs/HARDWARE.md](docs/HARDWARE.md) e [docs/esquema_cabo_rs232.png](docs/esquema_cabo_rs232.png))
 - Fonte em `RS-232`, `9600 BAUD`, `NONE 8 BITS` (menu I/O Config)
 
 ## 2. Firmware (ESP32-C3 Super Mini)
@@ -93,8 +93,8 @@ comandos e nunca responde, exatamente o sintoma da bancada.
 
 | Sintoma | Causa provável |
 |---|---|
-| App acha o ESP, LED só com flashes curtos, "fonte não responde" | DSR (pino 6) não está em +5 V, jumper 4–6 presente, TX/RX invertidos, baud/paridade diferentes. Rode `diag` no Monitor |
-| Display da fonte mostra `RMT` mas sem leitura | Mesmo caso acima: comandos chegam, respostas não (DSR) |
+| App acha o ESP, LED só com flashes curtos, "fonte não responde" | DSR (pino 6) ou CTS (pino 8) não está em +5 V, jumper 4–6 presente, TX/RX invertidos, baud/paridade diferentes. Rode `diag`/`edges` no Monitor |
+| Display da fonte mostra `RMT` mas sem leitura | Mesmo caso acima: comandos chegam, respostas não (DSR/CTS) |
 | Erros `-222 Data out of range` | Valor acima do limite da faixa atual |
 | `resposta composta invalida` | Use `PSU_COMPOUND_QUERY 0` (padrão) |
 | Painel da fonte travado | Modo RWL: use **Modo LOCAL** no app ou desligue "Travar painel" |

@@ -19,9 +19,10 @@
   superior (lado oposto ao 5V); `3V3`, `G` e `5V` ficam juntos junto ao USB-C.
 - **Módulo RS-232 azul** (U1 de 16 pinos, capacitores C1–C5, LED D1, DB9 "9P"):
   header de 4 pinos **GND, TX, RX, VCC** — só o canal 1 (T1/R1). Não existe
-  DTR/DSR no módulo, então `PSU_DTR_IN_GPIO`/`PSU_DSR_OUT_GPIO` ficam `-1`
-  (`firmware/main/board.h`), o
-  **pino 6 (DSR) recebe +5 V por 1 kΩ** e o **pino 4 (DTR) fica solto**.
+  DTR/DSR/RTS/CTS no módulo, então `PSU_DTR_IN_GPIO`/`PSU_DSR_OUT_GPIO` ficam
+  `-1` (`firmware/main/board.h`), e **duas** linhas de controle da fonte
+  precisam ser forçadas em nível verdadeiro com resistor: **pino 6 (DSR)** e
+  **pino 8 (CTS)**. Os pinos 4 (DTR) e 7 (RTS) ficam soltos.
 
 | Módulo | Super Mini |
 |---|---|
@@ -30,6 +31,13 @@
 | TX | GPIO21 |
 | RX | GPIO20 |
 | pino 6 do DB9 (DSR) | **5V por resistor de 1 kΩ** |
+| pino 8 do DB9 (CTS) | **5V por resistor de 1 kΩ** |
+
+Um cabo null-modem de fábrica (o que vem com o instrumento, ou o que o Lab
+Test usa no PC) resolve isso sozinho: ele cruza **4↔6 e 7↔8**, e tanto o DTR
+quanto o RTS do computador ficam sempre em nível alto quando a porta abre.
+Com o módulo de 4 pinos essas duas linhas não existem, então **as duas**
+precisam do resistor — só o DSR não é suficiente.
 
 A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
 `loop` no console (abaixo) e ele diz se a ida e a volta funcionam.
@@ -44,7 +52,7 @@ A rotulagem TX/RX desses módulos varia. Não adivinhe: rode o autoteste
    entre as duas pontas o cabo precisa ser **null-modem (cruzado)**: 2↔3 e 5↔5.
    Um cabo reto/extensor não funciona. Se os gêneros dos conectores não
    encaixam, use um adaptador de gênero ou faça um cabo curto.
-3. **Pino 6 em +5 V por 1 kΩ, pino 4 solto, sem jumper 4↔6** (ver abaixo).
+3. **Pino 6 e pino 8 em +5 V por 1 kΩ cada; pinos 4 e 7 soltos; sem jumper 4↔6** (ver abaixo).
 
 ### Diagnóstico pelo console USB
 
@@ -64,8 +72,9 @@ SCPI enviada (`>`) e recebida (`<`), e aceita comandos (digite `help`):
 
 Como ler o `diag`:
 
-- **0 bytes recebidos:** a fonte não transmite: DSR (pino 6) sem +5 V, jumper 4↔6, fio do pino 3,
-  ou fonte em HPIB. Se o display mostra `RMT` depois de `link`, a ida funciona e falta a volta.
+- **0 bytes recebidos:** a fonte não transmite: DSR (pino 6) ou CTS (pino 8) sem +5 V, jumper
+  4↔6, fio do pino 3, ou fonte em HPIB. Se o display mostra `RMT` depois de `link`, a ida
+  funciona e falta a volta.
 - **Bytes sem texto legível:** baud/paridade diferentes da fonte (menu I/O Config).
 - **`HEWLETT-PACKARD,E3634A,...`:** a serial está perfeita.
 
@@ -75,9 +84,9 @@ segundo, e conta quantas vezes ele mudou de nível. Isso tira qualquer dúvida d
 lista de suspeitos:
 
 - **"NADA chega ao pino RX"** (0 ou poucas transições): o sinal elétrico da fonte simplesmente não
-  está chegando no ESP. Não é mais baud nem firmware — confira (nesta ordem) o fio do pino 3 do
-  cabo (TXD da fonte), o GND, e se o pino 6 (DSR) está mesmo no pino certo do conector (não em um
-  pino vizinho por engano) e religue a fonte.
+  está chegando no ESP. Não é mais baud nem firmware — confira (nesta ordem) **o pino 8 (CTS) em
+  +5 V por 1 kΩ** (não só o 6), o fio do pino 3 do cabo (TXD da fonte), o GND, e se o pino 6
+  (DSR) está mesmo no pino certo do conector (não em um pino vizinho por engano); religue a fonte.
 - **"HA ATIVIDADE no pino RX"** (muitas transições): o sinal chega, só não decodifica — aí sim é
   baud/paridade/nível, confira o menu da fonte e tente `baud 1200` ou `baud 2400`.
 
@@ -94,7 +103,7 @@ responde e no ESP não, o firmware está certo e a diferença é elétrica (pino
 
 1. Só o módulo + ESP, **sem a fonte**: fio entre os pinos **2 e 3** do DB9 do módulo e, no
    console, `loop` → deve dar `OK`.
-2. Ligue o cabo com o pino 6 em +5 V (1 kΩ) e o pino 4 solto, fonte em
+2. Ligue o cabo com os pinos 6 e 8 em +5 V (1 kΩ cada) e os pinos 4 e 7 soltos, fonte em
    `RS-232 / 9600 / NONE 8 BITS`, **desligue e ligue a fonte**, e rode `diag`.
 3. Com o `diag` mostrando o `*IDN?`, use `link` (ou espere a reconexão automática) e o app.
 
@@ -120,6 +129,8 @@ A fonte salva isso em memória não volátil.
  │              │            └───────────────┘            │                           │
  │ GPIO8 = LED  │                             (solto) ┤ 4  DTR  (saída)           │
  │ 5V ──[1 kΩ]──┼─────────────────────────────────────────┤ 6  DSR  (entrada)         │
+ │ 5V ──[1 kΩ]──┼─────────────────────────────────────────┤ 8  CTS  (entrada)         │
+ │              │                             (solto) ┤ 7  RTS  (saída)           │
  └──────────────┘                                         │                           │
                                                           └───────────────────────────┘
 ```
@@ -143,6 +154,13 @@ fabricante neste ambiente**, então confira na seção *RS-232 Interface* do gui
   Even 7 bits;
 - o cabo que acompanha a fonte é 9 pinos fêmea ↔ fêmea (cruzado, para ligar a um PC).
 
+Além do DSR, há indicação (nota de aplicação da própria Agilent sobre RS-232, não específica da
+E3634A, então trate como reforço e não como regra garantida) de que **instrumentos Agilent em
+geral também exigem o CTS (pino 8) em nível verdadeiro** para se comunicar — uma segunda linha
+de handshake (RTS/CTS), independente do DTR/DSR. Um cabo null-modem de fábrica cruza **as duas**
+(4↔6 e 7↔8), então ela nunca aparece como problema por lá; um módulo de 4 pinos não tem nem uma
+nem outra, e só forçar o DSR pode não ser suficiente — ver item 3 abaixo.
+
 O manual também diz quando a fonte põe o **DTR em falso**:
 
 - quando o buffer de entrada enche (≈100 caracteres);
@@ -158,17 +176,18 @@ Consequências no projeto:
    continua falso: travamento a cada query. Comandos sem resposta (`SYST:REM`) funcionam; queries
    não. Os comandos seguintes ainda geram erro (`-410 Query INTERRUPTED`) e a fonte apita.
    No PC isso não acontece porque o DSR da fonte vem do DTR do PC, que fica sempre verdadeiro.
-3. Ligação correta com o módulo de 4 pinos: **pino 4 solto** e **pino 6 em +5 V por 1 kΩ**
-   (do pad `5V` do ESP). A entrada DSR tem ~5 kΩ, então o pino 6 fica em cerca de +4 V, nível
-   verdadeiro. 3,3 V fica no limite do receptor RS-232; use os 5 V.
+3. Ligação correta com o módulo de 4 pinos: **pino 4 e pino 7 soltos**, **pino 6 (DSR) e pino 8
+   (CTS) em +5 V por 1 kΩ cada** (do pad `5V` do ESP). A entrada tem ~5 kΩ, então cada pino fica
+   em cerca de +4 V, nível verdadeiro. 3,3 V fica no limite do receptor RS-232; use os 5 V. Se
+   você já tinha corrigido só o DSR e a fonte continuou muda, o CTS solto é a causa mais provável.
 4. O firmware abre a sessão com `<Ctrl-C>` (descarta uma resposta presa), `*CLS`, esvazia
    `SYST:ERR?`, `*IDN?` e só então `SYST:REM`, como o Lab Test; comandos terminam em `\r\n`.
 5. O manual sugere baud menor (300/600/1200) com o handshake desligado, para não estourar o
    buffer de entrada. Os comandos do firmware são curtos e cada query espera a resposta, então
    9600 deve servir; se aparecer `-363` (overrun) na fila de erros, use 1200 na fonte e em `PSU_BAUD`.
 6. Depois de mudar a ligação, **desligue e ligue a fonte** uma vez.
-7. Para conferir: com a fonte ligada e o cabo conectado, meça entre o pino 5 e o pino 6 no DB9 da
-   fonte: **cerca de +4 V** = DSR verdadeiro.
+7. Para conferir: com a fonte ligada e o cabo conectado, meça entre o pino 5 e o pino 6, e depois
+   entre o pino 5 e o pino 8, no DB9 da fonte: **cerca de +4 V** nos dois = DSR e CTS verdadeiros.
 
 ### Opcional: handshake completo com o 2º canal do MAX3232
 
@@ -196,8 +215,8 @@ fabricante. A E3634A é **DTE**. A regra que não falha:
    negativa no mesmo pino, são duas saídas se enfrentando → inverta 2↔3.
 
 O mais seguro é ignorar o DB9 do módulo e montar um cabo curto com um
-**DB9 fêmea de solda**: pinos 2, 3, 5 até o módulo, pino 6 em +5 V por 1 kΩ e
-pino 4 solto.
+**DB9 fêmea de solda**: pinos 2, 3, 5 até o módulo, pinos 6 e 8 em +5 V por
+1 kΩ cada, pinos 4 e 7 soltos.
 
 ## Alimentação
 
