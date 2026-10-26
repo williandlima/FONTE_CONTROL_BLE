@@ -3,7 +3,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define FW_VERSION "2.0.0"        /* sobe a cada mudanca; aparece no app */
+#define FW_VERSION "2.0.1"        /* sobe a cada mudanca; aparece no app */
 
 /* ---------------- RS-232 (manual E3634A, cap. 4 "Remote Interface Configuration") ----
  * Fonte: 9600 baud (fabrica), "NONE 8 BITS", 1 start bit, 2 stop bits.

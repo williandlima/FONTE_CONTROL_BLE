@@ -55,6 +55,7 @@ SCPI enviada (`>`) e recebida (`<`), e aceita comandos (digite `help`):
 |---|---|
 | `loop` | Loopback: com um fio entre os pinos **2 e 3** do DB9 do módulo (sem a fonte), o que sai tem que voltar |
 | `diag` | Manda `<Ctrl-C>` + `*IDN?` e mostra **todos os bytes crus** que voltarem em 1,5 s |
+| `edges` | Conta pulsos elétricos no pino RX, sem decodificar nada — não depende de baud/paridade, só diz se chegou alguma coisa |
 | `*IDN?`, `MEAS:VOLT?`... | Qualquer SCPI: com `?` mostra a resposta; sem `?` confere `SYST:ERR?` |
 | `link` | Nova tentativa de abrir a sessão com a fonte |
 | `baud 1200` | Muda a velocidade (tem que ser igual à da fonte) |
@@ -67,6 +68,18 @@ Como ler o `diag`:
   ou fonte em HPIB. Se o display mostra `RMT` depois de `link`, a ida funciona e falta a volta.
 - **Bytes sem texto legível:** baud/paridade diferentes da fonte (menu I/O Config).
 - **`HEWLETT-PACKARD,E3634A,...`:** a serial está perfeita.
+
+Se o `diag` continuar em 0 bytes mesmo com DSR em +5 V, interface em RS-232 e fonte religada,
+rode `edges`. Ele não usa a UART: só fica lendo o nível do pino RX direto do GPIO, 20 vezes por
+segundo, e conta quantas vezes ele mudou de nível. Isso tira qualquer dúvida de baud/paridade da
+lista de suspeitos:
+
+- **"NADA chega ao pino RX"** (0 ou poucas transições): o sinal elétrico da fonte simplesmente não
+  está chegando no ESP. Não é mais baud nem firmware — confira (nesta ordem) o fio do pino 3 do
+  cabo (TXD da fonte), o GND, e se o pino 6 (DSR) está mesmo no pino certo do conector (não em um
+  pino vizinho por engano) e religue a fonte.
+- **"HA ATIVIDADE no pino RX"** (muitas transições): o sinal chega, só não decodifica — aí sim é
+  baud/paridade/nível, confira o menu da fonte e tente `baud 1200` ou `baud 2400`.
 
 Obs.: no boot, a ROM do ESP32‑C3 imprime algumas linhas em 115200 no GPIO21 (antes do firmware
 assumir o pino). A fonte pode apitar **uma vez ao ligar/resetar o ESP**; a sessão seguinte limpa a

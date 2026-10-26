@@ -60,7 +60,7 @@ Na **barra azul de baixo** do VS Code:
    `>` é o que o ESP mandou e `<` é o que a fonte respondeu. Só `>` e
    `timeout rx=vazio` significa que a fonte não está respondendo
    ([HARDWARE.md](HARDWARE.md#diagnóstico-pelo-console-usb)).
-4. No Monitor dá para digitar `help`, `diag`, `loop`, `*IDN?`, `{"cmd":"meas"}` etc.
+4. No Monitor dá para digitar `help`, `diag`, `edges`, `loop`, `*IDN?`, `{"cmd":"meas"}` etc.
 
 > Só um programa abre a COM por vez: feche o Monitor antes de fazer Upload (o PlatformIO
 > costuma fechar sozinho) e feche Thonny/Arduino/PuTTY.

@@ -128,6 +128,7 @@ static const char HELP[] =
     "  *IDN?         qualquer SCPI: com '?' mostra a resposta, sem '?' confere SYST:ERR?\n"
     "  link          nova tentativa de conexao com a fonte\n"
     "  diag          Ctrl-C + *IDN? e mostra os bytes crus que voltarem (1,5 s)\n"
+    "  edges         conta pulsos no pino RX sem decodificar nada (independe de baud/paridade)\n"
     "  loop          teste de loopback (jumper nos pinos 2-3 do DB9 do modulo, sem a fonte)\n"
     "  baud N        muda a velocidade (300..9600); deve ser igual a da fonte\n"
     "  trace         liga/desliga o log das linhas SCPI\n"
@@ -176,6 +177,55 @@ static void cmd_loop(void)
                PSU_TX_GPIO, PSU_RX_GPIO);
 }
 
+/* Conta transicoes no pino RX, lendo o nivel direto do GPIO (sem passar pela UART,
+ * sem decodificar nada). Fatiado em pedacos de 19 ms com vTaskDelay(1) entre eles
+ * para nao travar o watchdog durante a espera. */
+static int count_edges(uint32_t total_ms)
+{
+    int last = gpio_get_level(PSU_RX_GPIO);
+    int n = 0;
+    for (uint32_t done = 0; done < total_ms; done += 20) {
+        int64_t end = esp_timer_get_time() + 19 * 1000;
+        while (esp_timer_get_time() < end) {
+            int v = gpio_get_level(PSU_RX_GPIO);
+            if (v != last) {
+                n++;
+                last = v;
+            }
+        }
+        vTaskDelay(1);
+    }
+    return n;
+}
+
+static void cmd_edges(void)
+{
+    printf("ocioso (1 s): ");
+    int idle = count_edges(1000);
+    printf("%d transicoes, nivel final %d (esperado 0 e 1)\n", idle, gpio_get_level(PSU_RX_GPIO));
+
+    uart_flush_input(PSU_UART_NUM);
+    uart_write_bytes(PSU_UART_NUM, "\x03", 1);
+    vTaskDelay(pdMS_TO_TICKS(150));
+    uart_write_bytes(PSU_UART_NUM, "SYST:REM\r\n", 10);
+    vTaskDelay(pdMS_TO_TICKS(200));
+    uart_write_bytes(PSU_UART_NUM, "*IDN?\r\n", 7);
+    printf("apos *IDN? (1,5 s): ");
+    int act = count_edges(1500);
+    printf("%d transicoes, nivel final %d\n", act, gpio_get_level(PSU_RX_GPIO));
+
+    if (act > 4)
+        printf("HA ATIVIDADE no pino RX (GPIO%d): a fonte esta transmitindo. Se 'diag' nao\n"
+               "decodifica nada legivel, o problema e baud/paridade/nivel eletrico, nao o cabo.\n",
+               PSU_RX_GPIO);
+    else
+        printf("NADA chega ao pino RX (GPIO%d), nem um pulso: a fonte nao esta transmitindo ate\n"
+               "aqui. Suspeitos: DSR (pino 6) nao esta realmente em +5V no pino certo, fio do\n"
+               "pino 3 do cabo rompido/no pino errado, GND nao ligado, ou a fonte travada\n"
+               "(religue-a). Isso NAO depende de baud/paridade/firmware.\n",
+               PSU_RX_GPIO);
+}
+
 static void console_line(char *s)
 {
     while (*s == ' ') s++;
@@ -195,6 +245,8 @@ static void console_line(char *s)
         cmd_diag();
     } else if (!strcmp(s, "loop")) {
         cmd_loop();
+    } else if (!strcmp(s, "edges")) {
+        cmd_edges();
     } else if (!strncmp(s, "baud ", 5)) {
         uart_setup((uint32_t)atoi(s + 5));
         printf("baud = %lu\n", (unsigned long)baud);
