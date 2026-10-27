@@ -12,13 +12,19 @@ Fontes consultadas:
 - [Keysight E3633A/E3634A User Manual (ManualsLib)](https://www.manualslib.com/manual/1210452/Keysight-E3633a.html)
 - [Agilent 34401A: DTR/DSR handshake protocol](https://www.manualsdir.com/manuals/41045/agilent-technologies-34401a.html?page=157) (mesmo texto da família)
 - [Agilent AN 5989-6580EN: RS-232 Troubleshooting](https://xdevs.com/doc/HP_Agilent_Keysight/5989-6580EN%20RS-232%20Troubleshooting%20-%20Application%20Note%20c20140910%20%5B8%5D.pdf)
-- [Keysight/Agilent E3633A/E3634A User's Guide (cópia widespan.co.kr)](http://www.widespan.co.kr/files/widespan/pdf/E3633A_E3634A_manual.pdf) — confirma 2 stop bits com paridade None
+- [Keysight/Agilent E3633A/E3634A User's Guide (cópia widespan.co.kr)](http://www.widespan.co.kr/files/widespan/pdf/E3633A_E3634A_manual.pdf) — um resumo (buscador de IA, não o PDF em si) deste manual dizia 2 stop bits com paridade None, 1 com paridade ativa
+- `e3634a_server.py` (implementação de referência do usuário, **validada na fonte real**) — usa 9600 8N**1** sempre, com `dsrdtr`/`rtscts` desligados, pausa mínima de 50 ms entre comandos, e lê `SYST:ERR?` só sob demanda
 - [Nota sobre RS-232 em instrumentos Agilent em geral (industrialmonitordirect.com, via 34401A)](https://industrialmonitordirect.com/blogs/knowledgebase/agilent-34401a-rs-232-remote-interface-setup-and-scpi-programming) — "most Agilent instruments must have CTS high (positive) in order to communicate"
 
 > Os PDFs não abriram neste ambiente (o proxy bloqueia os sites). Os itens marcados **✔** foram
 > confirmados nos trechos dos próprios manuais devolvidos pela busca. Os demais vêm do
 > conteúdo conhecido do manual da família E363x e batem com o Lab Test, que funcionou na fonte
 > real. Confira-os na seção indicada do guia se algo divergir.
+>
+> **Stop bits:** um resumo de busca (não o PDF em si) chegou a indicar "2 bits com paridade
+> None, 1 com paridade ativa". A referência real que **funciona na fonte** (`e3634a_server.py`
+> do usuário) usa **sempre 1**, com 8N. O firmware segue essa segunda fonte, por ser
+> implementação validada e não um resumo de terceiros.
 
 ## 1. Configuração da porta
 
@@ -27,7 +33,7 @@ Fontes consultadas:
 | Interface | `RS-232` no menu I/O Config (padrão de fábrica é GPIB/HPIB) | — |
 | Velocidade | 300, 600, 1200, 2400, 4800, **9600** (fábrica) | `PSU_BAUD 9600` |
 | Paridade/bits | **None 8 bits** (fábrica), Even 7 bits, Odd 7 bits | 8N |
-| Start/stop | 1 start bit; **2 stop bits** (padrão dos instrumentos Agilent ✔) | `PSU_STOP_BITS 2` (TX com 2 serve para quem espera 1 ou 2) |
+| Start/stop | 1 start bit; **1 stop bit** | `PSU_STOP_BITS 1` |
 | Conector | DB9 macho, a fonte é **DTE** ✔: 2 = RXD (entra), 3 = TXD (sai), 4 = DTR (sai), 5 = GND, **6 = DSR (entra)**, 7 = RTS (sai), **8 = CTS (entra)** | cabo cruzado 2↔3, 4↔6, 7↔8 |
 
 ## 2. Handshake DTR/DSR **e** RTS/CTS (a causa do `timeout rx=vazio`)
@@ -64,6 +70,14 @@ Por isso:
 | Jumper 4↔6 | Aceita comandos (`RMT` acende), **trava na 1ª query**; comandos seguintes dão `-410` e beep | `t_jumper_4_6_deadlock` |
 | Pino 6 solto | Aceita comandos, **nunca responde** | `t_dsr_open` |
 | PC com adaptador USB + cabo null-modem de fábrica (Lab Test) | Funciona: o DTR e o RTS do PC deixam o DSR e o CTS da fonte TRUE | `host/pc_bridge` |
+
+## 2.1 Pausa mínima entre comandos
+
+Segundo a implementação de referência do usuário (`e3634a_server.py`, validada na fonte real):
+a E3634A **perde caracteres** se dois comandos chegarem muito colados. Ela usa uma pausa mínima
+de **50 ms** antes de cada envio, independente de ter lido uma resposta no meio. O firmware
+aplica isso em `psu.c`: todo envio espera `PSU_MIN_GAP_MS` (50 ms, `config.h`) desde o fim do
+envio anterior.
 
 ## 3. Comandos exclusivos da RS-232
 

@@ -3,13 +3,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#define FW_VERSION "2.0.1"        /* sobe a cada mudanca; aparece no app */
+#define FW_VERSION "2.0.2"        /* sobe a cada mudanca; aparece no app */
 
 /* ---------------- RS-232 (manual E3634A, cap. 4 "Remote Interface Configuration") ----
  * Fonte: 9600 baud (fabrica), "NONE 8 BITS", 1 start bit, 2 stop bits.
  * TX com 2 stop bits funciona com fonte que espera 1 ou 2; RX aceita os dois. */
 #define PSU_BAUD 9600
-#define PSU_STOP_BITS 2
+#define PSU_STOP_BITS 1           /* confirmado por implementacao real (e3634a_server.py): sempre 1 */
+#define PSU_MIN_GAP_MS 50         /* pausa minima entre envios; a fonte perde bytes sem isso */
 #define PSU_TIMEOUT_MS 2500       /* resposta a uma query (MEAS? leva ~100 ms) */
 #define PSU_XONXOFF 1             /* igual ao Lab Test; inofensivo se a fonte nao usa */
 #define PSU_COMPOUND_QUERY 0      /* 0: MEAS:VOLT:DC? / 50 ms / MEAS:CURR:DC? (validado) */

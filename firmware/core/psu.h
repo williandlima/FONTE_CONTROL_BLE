@@ -73,6 +73,9 @@ typedef struct {
     char err[96];
     int scpi_code;
     char scpi_msg[96];
+    uint32_t min_gap_ms;    /* pausa minima entre dois envios (a fonte perde bytes sem isso) */
+    uint32_t last_tx_ms;
+    bool has_last_tx;
 } psu_t;
 
 /* faixa: limites programaveis (manual, "Programming Ranges") */

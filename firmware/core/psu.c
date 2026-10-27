@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
+
 #define XON 0x11
 #define XOFF 0x13
 
@@ -63,6 +65,7 @@ void psu_init(psu_t *p, const psu_io_t *io, uint32_t timeout_ms)
     p->timeout_ms = timeout_ms;
     p->xonxoff = true;
     p->state_every = 5;
+    p->min_gap_ms = PSU_MIN_GAP_MS;
 }
 
 /* ------------------------------------------------------------ baixo nivel */
@@ -115,10 +118,17 @@ static int send_line(psu_t *p, const char *line)
             nap(p, 2);
         }
     }
+    /* pausa minima entre dois envios: comandos muito colados perdem bytes na fonte */
+    if (p->has_last_tx) {
+        uint32_t gap = since(p, p->last_tx_ms);
+        if (gap < p->min_gap_ms) nap(p, p->min_gap_ms - gap);
+    }
     trace(p, '>', line);
     p->io.write(p->io.ctx, (const uint8_t *)line, strlen(line));
     p->io.write(p->io.ctx, (const uint8_t *)"\r\n", 2);
     if (p->io.activity) p->io.activity(p->io.ctx, false);
+    p->last_tx_ms = now(p);
+    p->has_last_tx = true;
     return PSU_OK;
 }
 
@@ -251,7 +261,9 @@ void psu_device_clear(psu_t *p)
     trace(p, '>', "<Ctrl-C>");
     p->io.write(p->io.ctx, (const uint8_t *)"\x03", 1);
     if (p->io.activity) p->io.activity(p->io.ctx, false);
-    nap(p, 150);
+    p->last_tx_ms = now(p);
+    p->has_last_tx = true;
+    nap(p, 150);              /* ja cobre o min_gap_ms com folga */
     flush_input(p);
 }
 

@@ -47,7 +47,7 @@ Na **barra azul de baixo** do VS Code:
    - Para fixar a porta, descomente `upload_port = COM10` no `platformio.ini`.
 3. Clique em **🔌 Monitor**. Deve aparecer:
    ```
-   E3634A-BLE firmware 2.0.0 | UART1 TX=GPIO21 RX=GPIO20 9600 8N2 | BLE "E3634A-BLE"
+   E3634A-BLE firmware 2.0.2 | UART1 TX=GPIO21 RX=GPIO20 9600 8N1 | BLE "E3634A-BLE"
    > <Ctrl-C>
    > *CLS
    > SYST:ERR?
