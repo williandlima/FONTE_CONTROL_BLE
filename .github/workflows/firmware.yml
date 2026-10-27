@@ -1,0 +1,57 @@
+name: firmware
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Testes do nucleo C (app -> bridge -> driver -> E3634A simulada)
+        run: make -C tests
+      - name: Ponta a ponta com porta serial virtual
+        run: make -C tests e2e
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio "esptool>=4.7,<5"
+      - name: Compila o firmware (PlatformIO + ESP-IDF)
+        run: pio run -d firmware
+      - name: Imagem unica para gravar em 0x0
+        run: |
+          B=firmware/.pio/build/supermini
+          python -m esptool --chip esp32c3 merge_bin -o $B/e3634a-ble-completo.bin \
+            --flash_mode dio --flash_size 4MB \
+            0x0 $B/bootloader.bin 0x8000 $B/partitions.bin 0x10000 $B/firmware.bin
+          ls -la $B/*.bin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-esp32c3-supermini
+          path: |
+            firmware/.pio/build/supermini/e3634a-ble-completo.bin
+            firmware/.pio/build/supermini/firmware.bin
+            firmware/.pio/build/supermini/bootloader.bin
+            firmware/.pio/build/supermini/partitions.bin
+
+  pc-bridge-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+      - run: make -C host windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pc_bridge-windows
+          path: host/bin/pc_bridge.exe

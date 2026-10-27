@@ -3,7 +3,9 @@
 package com.williandlima.fontecontrol.ui
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +36,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -54,6 +55,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -89,21 +91,35 @@ fun AppRoot(vm: PsuViewModel) {
             vm.consumeMessage()
         }
     }
+    val fwTxt = ui.fw?.let { " · FW $it" } ?: ""
+    val statusText = when {
+        ui.conn != ConnState.CONNECTED -> ui.conn.label()
+        !ui.link -> "BLE ok · fonte sem resposta$fwTxt"
+        else -> (ui.idn ?: "Conectado") + fwTxt
+    }
+    val statusColor = when {
+        ui.conn == ConnState.CONNECTING -> AmpColor
+        ui.conn != ConnState.CONNECTED -> TextMuted
+        !ui.link -> AmpColor
+        else -> OnColor
+    }
     Scaffold(
+        containerColor = Bg,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Panel,
+                    titleContentColor = TextMain,
+                    actionIconContentColor = TextMuted,
+                ),
                 title = {
                     Column {
-                        Text("Fonte E3634A", fontWeight = FontWeight.Bold)
-                        Text(
-                            when {
-                                ui.conn != ConnState.CONNECTED -> ui.conn.label()
-                                !ui.link -> "BLE ok - fonte sem resposta"
-                                else -> ui.idn ?: "Conectado"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                        )
+                        Text("FONTE E3634A", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.2.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).background(statusColor, CircleShape))
+                            Spacer(Modifier.width(6.dp))
+                            Text(statusText, fontSize = 11.sp, color = TextMuted, maxLines = 1)
+                        }
                     }
                 },
                 actions = {
@@ -140,7 +156,8 @@ fun ScanScreen(vm: PsuViewModel, conn: ConnState) {
     LaunchedEffect(Unit) { if (conn == ConnState.DISCONNECTED) vm.ble.startScan() }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Dispositivos BLE", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Text("DISPOSITIVOS BLE", fontSize = 12.sp, letterSpacing = 1.2.sp, fontWeight = FontWeight.SemiBold,
+                color = TextMuted, modifier = Modifier.weight(1f))
             if (scanning) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             else IconButton(onClick = { vm.ble.startScan() }) { Icon(Icons.Default.Search, "Procurar") }
         }
@@ -155,22 +172,23 @@ fun ScanScreen(vm: PsuViewModel, conn: ConnState) {
         }
         if (devices.isEmpty() && !scanning) {
             Text(
-                "Nenhuma ponte \"E3634A-BLE\" encontrada. Verifique se o ESP32 esta " +
+                "Nenhuma ponte \"E3634A-BLE\" encontrada. Verifique se o ESP32 está " +
                     "alimentado (LED piscando lento) e toque na lupa.",
                 Modifier.padding(top = 24.dp),
+                color = TextMuted,
             )
         }
         LazyColumn {
             items(devices, key = { it.address }) { d ->
-                Card(
+                PanelCard(
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { vm.ble.connect(d.address) }
                 ) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(d.name, fontWeight = FontWeight.Bold)
-                            Text(d.address, style = MaterialTheme.typography.bodySmall)
+                            Text(d.address, style = MaterialTheme.typography.bodySmall, color = TextMuted)
                         }
-                        Text("${d.rssi} dBm", style = MaterialTheme.typography.bodySmall)
+                        Text("${d.rssi} dBm", style = MaterialTheme.typography.bodySmall, color = TextMuted)
                     }
                 }
             }
@@ -182,19 +200,27 @@ fun ScanScreen(vm: PsuViewModel, conn: ConnState) {
 @Composable
 fun ControlScreen(vm: PsuViewModel, ui: UiState) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    val tabs = listOf("Painel", "Grafico", "Protecao", "Mais", "SCPI")
+    val tabs = listOf("Painel", "Gráfico", "Proteção", "Mais", "SCPI")
     Column(Modifier.fillMaxSize()) {
-        ScrollableTabRow(selectedTabIndex = tab, edgePadding = 8.dp) {
+        ScrollableTabRow(
+            selectedTabIndex = tab, edgePadding = 8.dp,
+            containerColor = Panel, contentColor = Accent,
+        ) {
             tabs.forEachIndexed { i, t ->
-                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t, maxLines = 1) })
+                Tab(
+                    selected = tab == i, onClick = { tab = i },
+                    selectedContentColor = Accent, unselectedContentColor = TextMuted,
+                    text = { Text(t.uppercase(), maxLines = 1, fontSize = 12.sp, letterSpacing = 0.8.sp) },
+                )
             }
         }
         if (!ui.link) {
             Row(
-                Modifier.fillMaxWidth().background(AlarmColor.copy(alpha = 0.2f)).padding(8.dp),
+                Modifier.fillMaxWidth().background(AlarmColor.copy(alpha = 0.16f))
+                    .padding(horizontal = 14.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Fonte nao responde no RS-232", Modifier.weight(1f))
+                Text("Fonte não responde no RS-232", Modifier.weight(1f), color = Color(0xFFFFB4B6), fontSize = 13.sp)
                 TextButton(onClick = vm::relink) { Text("Tentar") }
             }
         }
@@ -210,36 +236,49 @@ fun ControlScreen(vm: PsuViewModel, ui: UiState) {
 
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(8.dp))
+    PanelCard(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Column(Modifier.padding(14.dp)) {
+            Text(
+                title.uppercase(), fontSize = 11.sp, letterSpacing = 1.2.sp,
+                fontWeight = FontWeight.SemiBold, color = TextMuted,
+            )
+            Spacer(Modifier.height(10.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun Readout(value: Double?, unit: String, color: Color, fmt: String, big: Boolean = true) {
-    Row(verticalAlignment = Alignment.Bottom) {
+private fun Readout(caption: String, value: Double?, unit: String, color: Color, fmt: String, big: Boolean = true) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Text(
-            value?.let { fmt.format(it) } ?: "--.---",
+            caption, fontSize = 11.sp, letterSpacing = 1.2.sp, color = TextMuted,
+            modifier = Modifier.weight(1f).padding(bottom = if (big) 10.dp else 4.dp),
+        )
+        Text(
+            value?.let { fmt.format(it) } ?: "--.----",
             fontFamily = FontFamily.Monospace,
-            fontSize = if (big) 46.sp else 26.sp,
-            fontWeight = FontWeight.Bold,
+            fontSize = if (big) 44.sp else 24.sp,
+            fontWeight = FontWeight.Medium,
             color = color,
         )
-        Text(" $unit", fontSize = if (big) 22.sp else 16.sp, color = color,
-            modifier = Modifier.padding(bottom = if (big) 8.dp else 3.dp))
+        Text(
+            unit, fontSize = if (big) 20.sp else 14.sp, color = color.copy(alpha = 0.8f),
+            modifier = Modifier.width(if (big) 30.dp else 24.dp)
+                .padding(start = 4.dp, bottom = if (big) 8.dp else 3.dp),
+        )
     }
 }
 
 @Composable
 private fun Badge(text: String, color: Color) {
+    val pill = RoundedCornerShape(50)
     Text(
         text,
-        Modifier.background(color, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
-        color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+        Modifier.background(color.copy(alpha = 0.14f), pill)
+            .border(1.dp, color.copy(alpha = 0.55f), pill)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        color = color, fontWeight = FontWeight.SemiBold, fontSize = 11.sp, letterSpacing = 0.8.sp,
     )
 }
 
@@ -258,6 +297,7 @@ private fun NumberField(
         onValueChange = { text = it },
         label = { Text(label) },
         singleLine = true,
+        shape = RoundedCornerShape(10.dp),
         isError = parseNum(text) == null,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = {
@@ -280,6 +320,7 @@ private fun SetpointRow(
             OutlinedTextField(
                 value = text, onValueChange = { text = it },
                 label = { Text("$label ($unit)") }, singleLine = true,
+                shape = RoundedCornerShape(10.dp),
                 isError = parseNum(text) == null,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { parseNum(text)?.let(onSet); focus.clearFocus() }),
@@ -299,8 +340,10 @@ private fun trimNum(d: Double) = if (d >= 1) "%.0f".format(d) else d.toString().
 
 @Composable
 private fun SmallStep(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-        modifier = Modifier.height(34.dp)) { Text(label, fontSize = 12.sp) }
+    OutlinedButton(
+        onClick = onClick, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+        modifier = Modifier.height(34.dp), border = BorderStroke(1.dp, Line),
+    ) { Text(label, fontSize = 12.sp, color = TextMain) }
 }
 
 // ----------------------------------------------------------------- Painel
@@ -310,39 +353,53 @@ private fun PanelTab(vm: PsuViewModel, ui: UiState) {
     val s = ui.settings
     val tripped = m?.ovpTrip == true || m?.ocpTrip == true
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
+        PanelCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Badge(if (s.out) "OUTPUT ON" else "OUTPUT OFF", if (s.out) OnColor else Color.Gray)
+                    Badge(if (s.out) "OUTPUT ON" else "OUTPUT OFF", if (s.out) OnColor else TextMuted)
                     Spacer(Modifier.width(6.dp))
                     if (s.out && !tripped) Badge(if (ui.ccMode) "CC" else "CV", if (ui.ccMode) AmpColor else VoltColor)
                     Spacer(Modifier.width(6.dp))
                     if (m?.ovpTrip == true) Badge("OVP", AlarmColor)
                     if (m?.ocpTrip == true) Badge("OCP", AlarmColor)
                     Spacer(Modifier.weight(1f))
-                    Text(s.range, style = MaterialTheme.typography.labelLarge)
+                    Text(s.range, fontSize = 12.sp, color = TextMuted, letterSpacing = 1.sp)
                 }
-                Spacer(Modifier.height(4.dp))
-                Readout(m?.v, "V", VoltColor, "%7.4f")
-                Readout(m?.i, "A", AmpColor, "%7.5f")
-                Readout(m?.p, "W", MaterialTheme.colorScheme.onSurface, "%7.3f", big = false)
+                Spacer(Modifier.height(12.dp))
+                val lcd = RoundedCornerShape(10.dp)
+                Column(
+                    Modifier.fillMaxWidth().background(Lcd, lcd).border(1.dp, Line, lcd)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                ) {
+                    Readout("TENSÃO", m?.v, "V", VoltColor, "%7.4f")
+                    Readout("CORRENTE", m?.i, "A", AmpColor, "%7.5f")
+                    HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Line)
+                    Readout("POTÊNCIA", m?.p, "W", TextMain, "%7.3f", big = false)
+                }
             }
         }
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = { vm.output(!s.out) },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = if (s.out) AlarmColor else OnColor),
-        ) { Text(if (s.out) "DESLIGAR SAIDA" else "LIGAR SAIDA", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (s.out) AlarmButton else OnButton, contentColor = Color.White,
+            ),
+        ) {
+            Text(
+                if (s.out) "DESLIGAR SAÍDA" else "LIGAR SAÍDA",
+                fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp,
+            )
+        }
 
         if (tripped) {
             FilledTonalButton(onClick = vm::clearProtection, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Text("Limpar protecao (remova a causa antes)")
+                Text("Limpar proteção (remova a causa antes)")
             }
         }
 
         Section("Ajustes (programado: %.3f V / %.4f A)".format(s.vset, s.iset)) {
-            SetpointRow("Tensao", "V", s.vset, "%.3f", listOf(0.01, 0.1, 1.0),
+            SetpointRow("Tensão", "V", s.vset, "%.3f", listOf(0.01, 0.1, 1.0),
                 onSet = vm::setVoltage, onNudge = vm::nudgeVoltage)
             Spacer(Modifier.height(10.dp))
             SetpointRow("Corrente", "A", s.iset, "%.4f", listOf(0.001, 0.01, 0.1),
@@ -356,7 +413,7 @@ private fun PanelTab(vm: PsuViewModel, ui: UiState) {
                     label = { Text("50 V / 4 A") })
             }
         }
-        Section("Memorias (*SAV / *RCL)") {
+        Section("Memórias (*SAV / *RCL)") {
             MemoryRow(vm)
         }
     }
@@ -365,7 +422,7 @@ private fun PanelTab(vm: PsuViewModel, ui: UiState) {
 @Composable
 private fun MemoryRow(vm: PsuViewModel) {
     var confirmSave by remember { mutableStateOf<Int?>(null) }
-    Text("M1..M5 = carregar (*RCL)   |   S1..S5 = salvar (*SAV)", style = MaterialTheme.typography.bodySmall)
+    Text("M1..M5 = carregar (*RCL)   |   S1..S5 = salvar (*SAV)", fontSize = 12.sp, color = TextMuted)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         for (n in 1..5) FilledTonalButton(onClick = { vm.recall(n) }, contentPadding = PaddingValues(0.dp),
             modifier = Modifier.width(56.dp)) { Text("M$n") }
@@ -377,8 +434,8 @@ private fun MemoryRow(vm: PsuViewModel) {
     confirmSave?.let { n ->
         AlertDialog(
             onDismissRequest = { confirmSave = null },
-            title = { Text("Salvar memoria $n?") },
-            text = { Text("A configuracao atual sobrescrevera a memoria $n da fonte.") },
+            title = { Text("Salvar memória $n?") },
+            text = { Text("A configuração atual sobrescreverá a memória $n da fonte.") },
             confirmButton = { TextButton(onClick = { vm.save(n); confirmSave = null }) { Text("Salvar") } },
             dismissButton = { TextButton(onClick = { confirmSave = null }) { Text("Cancelar") } },
         )
@@ -399,12 +456,12 @@ private fun ChartTab(vm: PsuViewModel, ui: UiState) {
             for (w in windows) FilterChip(selected = win == w, onClick = { win = w },
                 label = { Text(if (w < 60) "${w}s" else "${w / 60}min") })
         }
-        Card(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        PanelCard(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
             TrendChart(shown, Modifier.padding(8.dp), height = 260)
         }
-        Section("Estatisticas") {
-            StatLine("Tensao min/max", "%.4f / %.4f V".format(st.vMin, st.vMax))
-            StatLine("Corrente min/max", "%.5f / %.5f A".format(st.iMin, st.iMax))
+        Section("Estatísticas") {
+            StatLine("Tensão mín/máx", "%.4f / %.4f V".format(st.vMin, st.vMax))
+            StatLine("Corrente mín/máx", "%.5f / %.5f A".format(st.iMin, st.iMax))
             StatLine("Carga", "%.4f Ah  (%.1f mAh)".format(st.ah, st.ah * 1000))
             StatLine("Energia", "%.4f Wh".format(st.wh))
             StatLine("Amostras", "${ui.history.size}")
@@ -438,8 +495,8 @@ private fun ChartTab(vm: PsuViewModel, ui: UiState) {
 @Composable
 private fun StatLine(k: String, v: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(k, Modifier.weight(1f))
-        Text(v, fontFamily = FontFamily.Monospace)
+        Text(k, Modifier.weight(1f), color = TextMuted, fontSize = 13.sp)
+        Text(v, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
     }
 }
 
@@ -449,27 +506,27 @@ private fun ProtectionTab(vm: PsuViewModel, ui: UiState) {
     val s = ui.settings
     val m = ui.meas
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
-        Section("OVP - sobretensao") {
+        Section("OVP – sobretensão") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Habilitada", Modifier.weight(1f))
                 Switch(checked = s.ovpEn, onCheckedChange = { vm.setOvp(null, it) })
             }
-            NumberField("Nivel OVP (1..55 V)", s.ovp, "%.2f", Modifier.fillMaxWidth()) { vm.setOvp(it, null) }
+            NumberField("Nível OVP (1..55 V)", s.ovp, "%.2f", Modifier.fillMaxWidth()) { vm.setOvp(it, null) }
             if (m?.ovpTrip == true) Text("OVP DISPARADA", color = AlarmColor, fontWeight = FontWeight.Bold)
         }
-        Section("OCP - sobrecorrente") {
+        Section("OCP – sobrecorrente") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Habilitada", Modifier.weight(1f))
                 Switch(checked = s.ocpEn, onCheckedChange = { vm.setOcp(null, it) })
             }
-            NumberField("Nivel OCP (0..7.5 A)", s.ocp, "%.3f", Modifier.fillMaxWidth()) { vm.setOcp(it, null) }
+            NumberField("Nível OCP (0..7.5 A)", s.ocp, "%.3f", Modifier.fillMaxWidth()) { vm.setOcp(it, null) }
             if (m?.ocpTrip == true) Text("OCP DISPARADA", color = AlarmColor, fontWeight = FontWeight.Bold)
         }
-        Button(onClick = vm::clearProtection, Modifier.fillMaxWidth()) { Text("Limpar protecoes (VOLT/CURR:PROT:CLE)") }
+        Button(onClick = vm::clearProtection, Modifier.fillMaxWidth()) { Text("Limpar proteções (VOLT/CURR:PROT:CLE)") }
         Text(
-            "Ao disparar, a saida e desligada. Remova a causa (carga/curto ou ajuste " +
+            "Ao disparar, a saída é desligada. Remova a causa (carga/curto ou ajuste " +
                 "acima do limite) antes de limpar.",
-            style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp),
+            fontSize = 12.sp, color = TextMuted, modifier = Modifier.padding(top = 8.dp),
         )
     }
 }
@@ -481,14 +538,18 @@ private fun MoreTab(vm: PsuViewModel, ui: UiState) {
     var text by rememberSaveable { mutableStateOf("") }
     var confirmReset by remember { mutableStateOf(false) }
     var lock by rememberSaveable { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val appVer = remember {
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "?"
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
         Section("Display da fonte") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Display ligado", Modifier.weight(1f))
                 Switch(checked = s.disp, onCheckedChange = vm::display)
             }
-            OutlinedTextField(text, { text = it.take(12) }, label = { Text("Mensagem (max 12)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(text, { text = it.take(12) }, label = { Text("Mensagem (máx. 12)") },
+                singleLine = true, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
                 Button(onClick = { vm.displayText(text) }) { Text("Mostrar") }
                 OutlinedButton(onClick = vm::displayTextClear) { Text("Limpar") }
@@ -509,8 +570,8 @@ private fun MoreTab(vm: PsuViewModel, ui: UiState) {
                 Button(onClick = vm::initiate) { Text("INIT") }
                 Button(onClick = vm::trigger) { Text("*TRG") }
             }
-            Text("Arme com INIT; com fonte BUS, *TRG aplica V/A trig apos o atraso.",
-                style = MaterialTheme.typography.bodySmall)
+            Text("Arme com INIT; com fonte BUS, *TRG aplica V/A trig após o atraso.",
+                fontSize = 12.sp, color = TextMuted)
         }
         Section("Sistema") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -527,14 +588,16 @@ private fun MoreTab(vm: PsuViewModel, ui: UiState) {
                     colors = ButtonDefaults.buttonColors(containerColor = AlarmColor)) { Text("*RST") }
             }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text(ui.idn ?: "-", style = MaterialTheme.typography.bodySmall)
+            Text("Fonte: ${ui.idn ?: "-"}", fontSize = 12.sp, color = TextMuted)
+            Text("Firmware da ponte: ${ui.fw ?: "-"}", fontSize = 12.sp, color = TextMuted)
+            Text("App: $appVer", fontSize = 12.sp, color = TextMuted)
         }
     }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Resetar a fonte?") },
-            text = { Text("*RST desliga a saida e volta todos os ajustes ao padrao de fabrica.") },
+            text = { Text("*RST desliga a saída e volta todos os ajustes ao padrão de fábrica.") },
             confirmButton = { TextButton(onClick = { vm.reset(); confirmReset = false }) { Text("Resetar") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancelar") } },
         )
@@ -560,19 +623,20 @@ private fun ConsoleTab(vm: PsuViewModel, ui: UiState) {
         LazyColumn(
             state = list,
             modifier = Modifier.weight(1f).fillMaxWidth().padding(vertical = 8.dp)
-                .background(Color.Black, RoundedCornerShape(8.dp)).padding(8.dp),
+                .background(Lcd, RoundedCornerShape(10.dp)).border(1.dp, Line, RoundedCornerShape(10.dp))
+                .padding(10.dp),
         ) {
             items(ui.console) { l ->
                 Text(l, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
                     color = when {
                         l.contains("  !") -> AlarmColor
-                        l.contains("  <") -> Color(0xFF7CFC9A)
-                        else -> Color(0xFFCFD8DC)
+                        l.contains("  <") -> OnColor
+                        else -> Color(0xFFB8C2CC)
                     })
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(q, { q = it }, label = { Text("Comando SCPI") }, singleLine = true,
+            OutlinedTextField(q, { q = it }, label = { Text("Comando SCPI") }, singleLine = true, shape = RoundedCornerShape(10.dp),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { if (q.isNotBlank()) { vm.scpi(q); q = "" } }),
                 modifier = Modifier.weight(1f))

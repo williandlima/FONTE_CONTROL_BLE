@@ -71,7 +71,7 @@ def main():
         print("Conectado:", psu.connect())
     except LinkError as e:
         print("Sem resposta da fonte (%s). Verifique baud, TX/RX cruzado, "
-              "GND e jumper DTR-DSR (pinos 4-6)." % e)
+              "GND e o DSR (pino 6) verdadeiro." % e)
         return 1
 
     while True:

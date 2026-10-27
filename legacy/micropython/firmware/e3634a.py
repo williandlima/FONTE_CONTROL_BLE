@@ -2,10 +2,16 @@
 # Compativel com MicroPython (machine.UART) e CPython (pyserial via adaptador
 # ou simulador), pois so usa write()/read()/any() do objeto uart.
 #
-# Metodo de comunicacao (o mesmo validado na bancada com esta fonte):
-#   - 8N1, 9600 baud, controle de fluxo XON/XOFF por software
+# Comunicacao (conforme o manual da familia E363x):
+#   - a fonte e DTE e usa handshake DTR/DSR (hardware): ela so transmite com o
+#     DSR (pino 6) verdadeiro. Para desativar: DTR (pino 4) desligado e DSR em
+#     nivel TRUE (+5 V por 1 kOhm). NAO usar jumper 4-6: ao ter uma resposta para
+#     mandar a fonte poe o DTR em FALSO; com o jumper o DSR cai junto e ela trava
+#   - o travamento (deadlock) se desfaz com <Ctrl-C> (0x03), que descarta a
+#     saida pendente; por isso toda sessao comeca com <Ctrl-C>
+#   - por RS-232 e preciso mandar SYST:REM antes dos demais comandos
 #   - escrita termina em "\r\n"; leitura aceita "\n" ou "\r"
-#   - sessao: espera 0,3 s, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
+#   - sessao: SYST:REM, *CLS, esvazia SYST:ERR? (max. 20), *IDN?
 #     (a fila de erros vazia evita o beep da fonte)
 #   - _write NAO limpa a entrada (evita -410 Query INTERRUPTED); so a query limpa
 #   - medicao: MEAS:VOLT:DC?, 50 ms, MEAS:CURR:DC?
@@ -59,13 +65,15 @@ def _b(s):
 
 class E3634A:
     def __init__(self, uart, timeout_ms=2500, compound=False, dtr_in=None, log=None,
-                 xonxoff=True, state_every=5):
+                 xonxoff=True, state_every=5, activity=None, idle=None):
         self.uart = uart
         self.timeout_ms = timeout_ms
         self.compound = compound
         self.dtr_in = dtr_in  # objeto Pin (entrada) ou None
         self.log = log
         self.xonxoff = xonxoff
+        self.activity = activity  # callback("tx"|"rx") p/ o LED de atividade serial
+        self.idle = idle          # chamado enquanto espera (mantem o LED atualizado)
         self.state_every = state_every
         self._rx = b""
         self._paused = False      # fonte mandou XOFF: nao transmitir
@@ -86,6 +94,8 @@ class E3634A:
         d = self.uart.read(n)
         if not d:
             return False
+        if self.activity:
+            self.activity("rx")
         if self.xonxoff:
             a, b = d.rfind(b"\x11"), d.rfind(b"\x13")
             if a >= 0 or b >= 0:
@@ -95,8 +105,10 @@ class E3634A:
         return True
 
     def _flush_input(self):
+        t0 = ticks_ms()
         while self._pull():
-            pass
+            if ticks_diff(ticks_ms(), t0) > 100:   # linha despejando dados sem parar
+                break
         self._rx = b""
 
     def _send(self, line):
@@ -117,6 +129,8 @@ class E3634A:
                 sleep_ms(2)
         self._dbg(">>", line)
         self.uart.write(line.encode() + b"\r\n")
+        if self.activity:
+            self.activity("tx")
 
     def _readline(self, timeout_ms=None):
         timeout_ms = self.timeout_ms if timeout_ms is None else timeout_ms
@@ -129,17 +143,25 @@ class E3634A:
                     break
             if i >= 0:
                 line, self._rx = self._rx[:i], self._rx[i + 1:]
-                s = line.decode().strip(" \x00")
+                try:
+                    s = line.decode().strip(" \x00")
+                except UnicodeError:           # lixo (baud/paridade errados)
+                    raise LinkError("rx invalido " + repr(line[:16]))
                 if not s:                      # sobra do \r\n: ignorar
                     continue
                 self._dbg("<<", s)
                 return s
-            if self._pull():
-                continue
+            # o tempo limite vale mesmo com dados chegando (fluxo continuo/ruido)
             if ticks_diff(ticks_ms(), t0) > timeout_ms:
                 got, self._rx = self._rx, b""
-                # bytes sem '\n': lixo = baud/paridade errados; vazio = sem resposta
+                # bytes sem terminador: lixo = baud/paridade errados; vazio = sem resposta
                 raise LinkError("timeout rx=" + (repr(got[:16]) if got else "vazio"))
+            if self._pull():
+                if len(self._rx) > 256:            # nao deixar crescer sem limite
+                    self._rx = self._rx[-64:]
+                continue
+            if self.idle:
+                self.idle()
             sleep_ms(2)
 
     def query(self, cmd, timeout_ms=None):
@@ -181,16 +203,40 @@ class E3634A:
             raise SCPIError(errs[0][0], errs[0][1])
 
     # --------------------------------------------------------------- sessao
-    def connect(self, lock_panel=False):
+    def device_clear(self):
+        """<Ctrl-C>: cancela a operacao em curso e descarta a saida pendente."""
+        self.uart.write(b"\x03")
+        if self.activity:
+            self.activity("tx")
+        sleep_ms(150)
+        self._flush_input()
+
+    def connect(self, lock_panel=False, labtest=False):
         self._paused = False
         self._flush_input()
         sleep_ms(300)                       # porta/fonte estabilizam
+        if labtest:
+            # sequencia do Lab Test (validada na fonte real): *CLS, esvazia SYST:ERR?,
+            # *IDN?; so depois SYST:REM. Antes, <Ctrl-C> descarta resposta presa.
+            self.device_clear()
+            self.write("*CLS", check=False)
+            self.errors(1200)
+            self.idn = self.query("*IDN?", 1200)
+            if not self.idn:
+                raise LinkError("IDN vazio")
+            self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
+            sleep_ms(100)
+            self._state_n = 0
+            return self.idn
+        self.device_clear()                 # desfaz travamento DTR/DSR de sessoes anteriores
+        # RS-232 so aceita comandos em modo remoto: SYST:REM sempre primeiro
+        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
+        sleep_ms(100)
         self.write("*CLS", check=False)
         self.errors(1200)                   # esvazia a fila: sem beep
         self.idn = self.query("*IDN?", 1200)
         if not self.idn:
             raise LinkError("IDN vazio")
-        self.write("SYST:RWL" if lock_panel else "SYST:REM", check=False)
         self._state_n = 0                   # forca releitura do estado
         return self.idn
 

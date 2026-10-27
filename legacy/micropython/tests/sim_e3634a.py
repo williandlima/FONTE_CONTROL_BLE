@@ -28,6 +28,10 @@ class SimE3634A:
     def write(self, data):
         if not self.alive:
             return len(data)
+        if b"\x03" in data:                      # device clear
+            data = data.replace(b"\x03", b"")
+            self._out = b""
+            self.cleared = getattr(self, "cleared", 0) + 1
         self._in += data
         while b"\n" in self._in:
             line, self._in = self._in.split(b"\n", 1)

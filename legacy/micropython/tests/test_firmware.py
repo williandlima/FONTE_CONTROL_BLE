@@ -94,8 +94,33 @@ class ProtocolTest(unittest.TestCase):
         sim = SimE3634A()
         psu = E3634A(sim, timeout_ms=200)
         psu.connect()
-        self.assertEqual(sim.log[:3], ["*CLS", "SYST:ERR?", "*IDN?"])
-        self.assertEqual(sim.log[3], "SYST:REM")
+        self.assertEqual(sim.log[:4], ["SYST:REM", "*CLS", "SYST:ERR?", "*IDN?"])
+
+    def test_labtest_sequence_ctrl_c_first_and_remote_last(self):
+        sim = SimE3634A()
+        raw = []
+        orig = sim.write
+        sim.write = lambda d: (raw.append(bytes(d)), orig(d))[1]
+        psu = E3634A(sim, timeout_ms=200)
+        self.assertIn("E3634A", psu.connect(labtest=True))
+        self.assertEqual(sim.log[:4], ["*CLS", "SYST:ERR?", "*IDN?", "SYST:REM"])
+        self.assertEqual(raw[0], b"\x03")            # descarta resposta presa
+        self.assertTrue(sim.remote)
+
+    def test_activity_callback_tx_and_rx(self):
+        sim = SimE3634A()
+        ev = []
+        psu = E3634A(sim, timeout_ms=200, activity=ev.append)
+        psu.query("*IDN?")
+        self.assertEqual(ev[0], "tx")
+        self.assertIn("rx", ev)
+
+    def test_connect_sends_device_clear_first(self):
+        sim = SimE3634A()
+        sim._out = b"RESPOSTA PENDENTE\r\n"      # saida presa de sessao anterior
+        psu = E3634A(sim, timeout_ms=200)
+        self.assertIn("E3634A", psu.connect())
+        self.assertEqual(getattr(sim, "cleared", 0), 1)
 
     def test_writes_end_with_crlf(self):
         sim = SimE3634A()
@@ -104,7 +129,8 @@ class ProtocolTest(unittest.TestCase):
         sim.write = lambda d: (raw.append(d), orig(d))[1]
         psu = E3634A(sim, timeout_ms=200)
         psu.connect()
-        self.assertTrue(all(d.endswith(b"\r\n") for d in raw))
+        self.assertEqual(raw[0], b"\x03")            # device clear: sem terminador
+        self.assertTrue(all(d.endswith(b"\r\n") for d in raw[1:]))
 
     def test_xonxoff_stripped_from_replies(self):
         sim = SimE3634A(flow=True)
@@ -149,6 +175,41 @@ class ProtocolTest(unittest.TestCase):
         sim.log.clear()
         psu.measure()
         self.assertEqual(sim.log[:2], ["MEAS:VOLT:DC?", "MEAS:CURR:DC?"])
+
+
+class FloodUART:
+    """UART que despeja bytes sem parar e sem terminador (ruido/linha presa)."""
+
+    def __init__(self):
+        self.out = []
+
+    def write(self, d):
+        return len(d)
+
+    def any(self):
+        return 8
+
+    def read(self, n=-1):
+        return b"\x00\xff" * 4
+
+
+class FloodTest(unittest.TestCase):
+    def test_query_times_out_under_continuous_stream(self):
+        import time
+        psu = E3634A(FloodUART(), timeout_ms=150)
+        t0 = time.monotonic()
+        with self.assertRaises(LinkError) as cm:
+            psu.query("*IDN?")
+        self.assertLess(time.monotonic() - t0, 2.0)
+        self.assertIn("timeout rx=", str(cm.exception))
+
+    def test_connect_fails_fast_under_continuous_stream(self):
+        import time
+        psu = E3634A(FloodUART(), timeout_ms=150)
+        t0 = time.monotonic()
+        with self.assertRaises(LinkError):
+            psu.connect()
+        self.assertLess(time.monotonic() - t0, 3.0)
 
 
 class BridgeTest(unittest.TestCase):
@@ -210,6 +271,20 @@ class BridgeTest(unittest.TestCase):
         self.assertAlmostEqual(m[0]["v"], 5.0)
         self.assertAlmostEqual(m[0]["i"], 0.5)
         self.assertTrue(m[0]["o"])
+
+    def test_version_command_works_without_link(self):
+        from bridge import FW_VERSION
+        self.br.link = False             # fonte fora do ar: ainda responde
+        r = self.cmd(cmd="version")
+        self.assertTrue(r["ok"])
+        self.assertEqual(r["d"], FW_VERSION)
+
+    def test_hello_carries_firmware_version(self):
+        from bridge import FW_VERSION
+        self.out.clear()
+        self.br.on_client(True)
+        h = self.msgs("hello")[0]
+        self.assertEqual(h["fw"], FW_VERSION)
 
     def test_poll_min(self):
         r = self.cmd(cmd="poll", ms=10)

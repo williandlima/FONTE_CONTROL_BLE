@@ -11,6 +11,9 @@ except ImportError:
     from e3634a import ticks_ms, ticks_diff
 
 
+FW_VERSION = "1.1.5"   # sobe a cada mudanca de firmware; aparece no app
+
+
 class CmdError(Exception):
     pass
 
@@ -29,13 +32,14 @@ def _num(d, k, lo=None, hi=None):
 
 class Bridge:
     def __init__(self, psu, send, poll_ms=500, poll_min_ms=150,
-                 reconnect_ms=3000, lock_panel=False):
+                 reconnect_ms=3000, lock_panel=False, labtest=False):
         self.psu = psu
         self.send = send            # send(str) -> envia uma linha ao app
         self.poll_ms = poll_ms
         self.poll_min_ms = poll_min_ms
         self.reconnect_ms = reconnect_ms
         self.lock_panel = lock_panel
+        self.labtest = labtest
         self.link = False
         self.client = False         # app conectado via BLE
         self.state = {}
@@ -65,7 +69,7 @@ class Bridge:
         self.client = connected
         if connected:
             self._t_link = None  # tenta (re)ligar a fonte imediatamente
-            m = {"t": "hello", "fw": "1.0", "link": self.link, "poll": self.poll_ms}
+            m = {"t": "hello", "fw": FW_VERSION, "link": self.link, "poll": self.poll_ms}
             if self.link:
                 m["idn"] = self.psu.idn
             self.emit(m)
@@ -88,7 +92,7 @@ class Bridge:
 
     def try_link(self):
         try:
-            self.psu.connect(self.lock_panel)
+            self.psu.connect(self.lock_panel, self.labtest)
         except (LinkError, SCPIError) as e:
             self._fails += 1
             self.last_err = str(e)
@@ -188,6 +192,8 @@ class Bridge:
             return self.poll_ms
         if c == "ping":
             return "pong"
+        if c == "version":
+            return FW_VERSION
         if c == "link":
             if not self.try_link():
                 raise CmdError("sem resposta da fonte: " + self.last_err)
